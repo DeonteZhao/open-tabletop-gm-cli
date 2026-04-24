@@ -6,6 +6,116 @@ from engine import Engine
 import time
 import sys
 
+NOTHING_DESIGN_CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Doto:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+    --black: #000000;
+    --surface: #111111;
+    --surface-raised: #1A1A1A;
+    --border: #222222;
+    --border-visible: #333333;
+    --text-disabled: #666666;
+    --text-secondary: #999999;
+    --text-primary: #E8E8E8;
+    --text-display: #FFFFFF;
+    --accent: #D71921;
+    --success: #4A9E5C;
+    --warning: #D4A843;
+    --interactive: #5B9BF6;
+    --eldritch: #7B68EE;
+    --eldritch-subtle: rgba(123,104,238,0.12);
+    --insanity: #FF6B35;
+    --death: #8B0000;
+    --font-display: 'Doto', sans-serif;
+    --font-body: 'Space Grotesk', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+}
+
+body, .gradio-container {
+    background-color: var(--black) !important;
+    color: var(--text-primary) !important;
+    font-family: var(--font-body) !important;
+}
+
+h1, h2, h3, h4 {
+    font-family: var(--font-display) !important;
+    color: var(--text-display) !important;
+    letter-spacing: -0.02em;
+}
+
+.tabs {
+    border-bottom: 1px solid var(--border-visible) !important;
+}
+.tab-nav button {
+    font-family: var(--font-mono) !important;
+    font-size: 12px !important;
+    text-transform: uppercase !important;
+    color: var(--text-secondary) !important;
+    border: none !important;
+    background: transparent !important;
+}
+.tab-nav button.selected {
+    color: var(--text-display) !important;
+    border-bottom: 2px solid var(--text-display) !important;
+}
+
+button.primary {
+    background-color: var(--text-display) !important;
+    color: var(--black) !important;
+    font-family: var(--font-mono) !important;
+    font-size: 13px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+    border-radius: 999px !important;
+    border: none !important;
+}
+button.secondary {
+    background-color: transparent !important;
+    color: var(--text-primary) !important;
+    font-family: var(--font-mono) !important;
+    font-size: 13px !important;
+    border-radius: 999px !important;
+    border: 1px solid var(--border-visible) !important;
+    text-transform: uppercase !important;
+}
+
+input, textarea, .dropdown {
+    background-color: var(--surface) !important;
+    border: 1px solid var(--border-visible) !important;
+    color: var(--text-primary) !important;
+    font-family: var(--font-body) !important;
+    border-radius: 8px !important;
+}
+input:focus, textarea:focus {
+    border-color: var(--text-primary) !important;
+    outline: none !important;
+}
+
+label, .label-text {
+    font-family: var(--font-mono) !important;
+    color: var(--text-secondary) !important;
+    text-transform: uppercase !important;
+    font-size: 11px !important;
+}
+
+.chatbot {
+    background-color: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+}
+.message-wrap .message.user {
+    background-color: var(--surface-raised) !important;
+    border: 1px solid var(--border-visible) !important;
+    color: var(--text-primary) !important;
+}
+.message-wrap .message.bot {
+    background-color: transparent !important;
+    border-left: 2px solid var(--border-visible) !important;
+    border-radius: 0 !important;
+    color: var(--text-primary) !important;
+}
+"""
+
 # Global state to keep track of the loaded engine
 current_engine = None
 campaign_loaded = ""
@@ -81,7 +191,11 @@ def chat_with_gm(user_message, history):
         yield "", history
 
 
-with gr.Blocks(title="Open Tabletop GM Web UI") as app:
+with gr.Blocks(
+    title="Open Tabletop GM Web UI",
+    theme=gr.themes.Base(),
+    css=NOTHING_DESIGN_CSS
+) as app:
     gr.Markdown("# Open Tabletop GM 🎲")
     
     with gr.Tabs():
