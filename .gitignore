@@ -1,0 +1,47 @@
+# Display companion runtime files
+display/.token
+display/stats.json
+display/text_log.json
+display/app.log
+display/app.pid
+display/cert.pem
+display/key.pem
+display/.campaign
+display/.input_queue
+display/.input_trigger
+display/input_log.json
+display/player_input.json
+
+# SRD dataset (generated — run build_srd.py)
+systems/dnd5e/data/dnd5e_srd.json
+systems/dnd5e/data/dnd5e_supplemental.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+campaigns/
+
+# Local-only helper files
+no_think.md
+paths.md
+
+# Config and User Data
+.config/
+config.json
+*.json
+!probe/tools.json
+!probe/test_suite.json
+
+# OS
+.DS_Store
+**/.DS_Store
+display/.scheme
+
+# Probe run logs (verbose stdout — results are in .json)
+probe/results/**/*.log
+probe/results/*.log
+
+# Draft docs (not ready to publish)
+docs/DISCUSSION-DRAFT.md
+docs/PR-DRAFT.md
