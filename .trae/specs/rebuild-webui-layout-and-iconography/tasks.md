@@ -20,10 +20,10 @@
 - [x] Task 4B: 强化双系统专属组件形态
   - [x] SubTask 4B.1: 为 CoC 7E 提供更明确的理智、调查和 d100 语义组件
   - [x] SubTask 4B.2: 为 D&D 5e 提供更明确的战斗、资源和行动语义组件
-- [ ] Task 5: 验证、预览与交付
+- [x] Task 5: 验证、预览与交付
   - [x] SubTask 5.1: 本地启动 Web UI 并核对主要页面布局
   - [x] SubTask 5.2: 检查图标、字体、间距、颜色与系统语义是否一致
-  - [ ] SubTask 5.3: 提交代码并推送到 GitHub
+  - [x] SubTask 5.3: 提交代码并推送到 GitHub
 
 # Task Dependencies
 - [Task 2] depends on [Task 1]
