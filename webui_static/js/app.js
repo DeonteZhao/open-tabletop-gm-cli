@@ -15,6 +15,10 @@
     campaignForm: document.getElementById("campaign-form"),
     campaignName: document.getElementById("campaign-name"),
     campaignSystem: document.getElementById("campaign-system"),
+    importForm: document.getElementById("import-form"),
+    importCampaignName: document.getElementById("import-campaign-name"),
+    importCampaignSystem: document.getElementById("import-campaign-system"),
+    importSource: document.getElementById("import-source"),
     chatForm: document.getElementById("chat-form"),
     chatInput: document.getElementById("chat-input"),
     chatSubmit: document.getElementById("chat-submit"),
@@ -475,6 +479,19 @@
     return data;
   }
 
+  async function postForm(url, formData) {
+    const response = await fetch(url, {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || "请求失败");
+    }
+    return data;
+  }
+
   function mergeState(nextState) {
     Object.keys(state).forEach((key) => {
       delete state[key];
@@ -518,6 +535,30 @@
       const data = await postJson("/api/campaigns", payload);
       mergeState(data.state);
       elements.campaignForm.reset();
+    } catch (error) {
+      pushInlineStatus(error.message);
+    }
+  });
+
+  elements.importForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const source = elements.importSource.files && elements.importSource.files[0];
+    if (!source) {
+      pushInlineStatus("请先选择要导入的模组文件。");
+      return;
+    }
+
+    try {
+      pushInlineStatus("正在导入模组...");
+      const formData = new FormData();
+      formData.append("name", elements.importCampaignName.value.trim());
+      formData.append("system", elements.importCampaignSystem.value);
+      formData.append("source", source);
+      const data = await postForm("/api/import-module", formData);
+      mergeState(data.state);
+      renderAll();
+      elements.importForm.reset();
+      pushInlineStatus(data.message);
     } catch (error) {
       pushInlineStatus(error.message);
     }

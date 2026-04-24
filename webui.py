@@ -4,20 +4,25 @@ import json
 import os
 import secrets
 import threading
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request, session
+from werkzeug.utils import secure_filename
 
 from campaign import CAMPAIGNS_DIR, create_campaign, list_campaigns
 from config import CONFIG_FILE, Config, get_config
 from engine import Engine
+from importer import import_pdf
 
 
 BASE_DIR = Path(__file__).resolve().parent
 WEBUI_TEMPLATES_DIR = BASE_DIR / "webui_templates"
 WEBUI_STATIC_DIR = BASE_DIR / "webui_static"
 DEFAULT_PORT = 7860
+UPLOADS_DIR = Path(tempfile.gettempdir()) / "open-tabletop-gm" / "imports"
+ALLOWED_IMPORT_EXTENSIONS = {".pdf", ".docx", ".md", ".txt"}
 
 SYSTEM_META = {
     "dnd5e": {
@@ -301,6 +306,10 @@ def _json_error(message: str, status_code: int = 400):
     return response
 
 
+def _campaign_exists(name: str) -> bool:
+    return (CAMPAIGNS_DIR / name).exists()
+
+
 def save_config(api_key: str, base_url: str, model: str) -> str:
     config = Config()
     config.api_key = api_key.strip()
@@ -409,6 +418,49 @@ def create_campaign_route():
 
     state = _get_session_state()
     state.status_message = message
+    return jsonify({"ok": True, "message": message, "state": _serialize_state()})
+
+
+@app.post("/api/import-module")
+def import_module_route():
+    campaign_name = (request.form.get("name") or "").strip()
+    system = (request.form.get("system") or "dnd5e").strip()
+    source = request.files.get("source")
+
+    if not campaign_name:
+        return _json_error("请先填写导入目标战役名称。", 400)
+    if source is None or not source.filename:
+        return _json_error("请先选择一个 PDF、DOCX、MD 或 TXT 文件。", 400)
+
+    suffix = Path(source.filename).suffix.lower()
+    if suffix not in ALLOWED_IMPORT_EXTENSIONS:
+        return _json_error("仅支持 PDF、DOCX、MD 和 TXT 文件。", 400)
+
+    config = get_config()
+    if not config.api_key:
+        return _json_error("导入模组前请先在配置区保存 API Key。", 400)
+
+    if not _campaign_exists(campaign_name):
+        created = create_campaign(campaign_name, system)
+        if not created:
+            return _json_error("创建导入目标战役失败，请检查名称是否重复。", 400)
+
+    safe_name = secure_filename(Path(source.filename).name) or f"module{suffix}"
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    upload_path = UPLOADS_DIR / f"{secrets.token_hex(8)}-{safe_name}"
+    source.save(upload_path)
+
+    try:
+        ok, message = import_pdf(campaign_name, str(upload_path))
+    finally:
+        if upload_path.exists():
+            upload_path.unlink()
+
+    if not ok:
+        return _json_error(f"导入模组失败：{message}", 500)
+
+    state = _get_session_state()
+    state.status_message = f"模组已导入到战役：{campaign_name}"
     return jsonify({"ok": True, "message": message, "state": _serialize_state()})
 
 

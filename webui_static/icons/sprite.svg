@@ -31,6 +31,11 @@
     <path d="M12 5v14"></path>
     <path d="M5 12h14"></path>
   </symbol>
+  <symbol id="icon-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 16V5"></path>
+    <path d="M8 9l4-4 4 4"></path>
+    <path d="M5 19h14"></path>
+  </symbol>
   <symbol id="icon-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M4 12 20 4l-4 16-3.5-5.5L4 12z"></path>
     <path d="M12.5 14.5 20 4"></path>

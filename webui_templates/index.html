@@ -82,34 +82,69 @@
             </div>
           </section>
 
-          <section class="panel panel-form">
-            <div class="panel-head">
-              <div>
-                <p class="eyebrow">创建</p>
-                <h3>New Campaign</h3>
+          <div class="stage-side-stack">
+            <section class="panel panel-form">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">创建</p>
+                  <h3>New Campaign</h3>
+                </div>
               </div>
-            </div>
-            <form id="campaign-form" class="form-stack">
-              <label class="field">
-                <span>战役名称</span>
-                <input id="campaign-name" name="name" type="text" placeholder="例如：迷雾镇冒险">
-              </label>
-              <label class="field">
-                <span>规则系统</span>
-                <select id="campaign-system" name="system">
-                  {% for key, system in systems.items() %}
-                    <option value="{{ key }}">{{ system.label }} / {{ system.tagline }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-              <button class="button primary" type="submit">
-                <svg class="icon" aria-hidden="true">
-                  <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-plus"></use>
-                </svg>
-                <span>创建战役</span>
-              </button>
-            </form>
-          </section>
+              <form id="campaign-form" class="form-stack">
+                <label class="field">
+                  <span>战役名称</span>
+                  <input id="campaign-name" name="name" type="text" placeholder="例如：迷雾镇冒险">
+                </label>
+                <label class="field">
+                  <span>规则系统</span>
+                  <select id="campaign-system" name="system">
+                    {% for key, system in systems.items() %}
+                      <option value="{{ key }}">{{ system.label }} / {{ system.tagline }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <button class="button primary" type="submit">
+                  <svg class="icon" aria-hidden="true">
+                    <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-plus"></use>
+                  </svg>
+                  <span>创建战役</span>
+                </button>
+              </form>
+            </section>
+
+            <section class="panel panel-form">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">导入</p>
+                  <h3>Import Module</h3>
+                </div>
+              </div>
+              <form id="import-form" class="form-stack" enctype="multipart/form-data">
+                <label class="field">
+                  <span>目标战役名称</span>
+                  <input id="import-campaign-name" name="name" type="text" placeholder="导入到已有战役，或输入新战役名称">
+                </label>
+                <label class="field">
+                  <span>规则系统</span>
+                  <select id="import-campaign-system" name="system">
+                    {% for key, system in systems.items() %}
+                      <option value="{{ key }}">{{ system.label }} / {{ system.tagline }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label class="field">
+                  <span>模组文件</span>
+                  <input id="import-source" name="source" type="file" accept=".pdf,.docx,.md,.txt">
+                </label>
+                <button class="button secondary" type="submit">
+                  <svg class="icon" aria-hidden="true">
+                    <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-upload"></use>
+                  </svg>
+                  <span>导入模组</span>
+                </button>
+              </form>
+            </section>
+          </div>
         </div>
       </section>
 

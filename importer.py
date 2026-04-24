@@ -78,8 +78,9 @@ def import_pdf(campaign_name: str, pdf_path: str):
     campaign_dir = CAMPAIGNS_DIR / campaign_name
     
     if not os.path.exists(pdf_path):
-        print(f"File not found: {pdf_path}")
-        return
+        message = f"File not found: {pdf_path}"
+        print(message)
+        return False, message
 
     # Check file extension
     file_ext = Path(pdf_path).suffix.lower()
@@ -94,8 +95,9 @@ def import_pdf(campaign_name: str, pdf_path: str):
                 full_text += page.get_text()
             doc.close()
         except Exception as e:
-            print(f"Failed to read PDF: {e}")
-            return
+            message = f"Failed to read PDF: {e}"
+            print(message)
+            return False, message
     elif file_ext == ".docx":
         try:
             from docx import Document
@@ -103,26 +105,31 @@ def import_pdf(campaign_name: str, pdf_path: str):
             for para in doc.paragraphs:
                 full_text += para.text + "\n"
         except ImportError:
-            print("Error: 'python-docx' library is required to read .docx files.")
+            message = "Error: 'python-docx' library is required to read .docx files."
+            print(message)
             print("Please install it using: pip install python-docx")
-            return
+            return False, message
         except Exception as e:
-            print(f"Failed to read DOCX: {e}")
-            return
+            message = f"Failed to read DOCX: {e}"
+            print(message)
+            return False, message
     elif file_ext in [".md", ".txt"]:
         try:
             with open(pdf_path, 'r', encoding='utf-8') as f:
                 full_text = f.read()
         except Exception as e:
-            print(f"Failed to read text file: {e}")
-            return
+            message = f"Failed to read text file: {e}"
+            print(message)
+            return False, message
     else:
-        print(f"Unsupported file type: {file_ext}. Please use PDF, DOCX, MD, or TXT.")
-        return
+        message = f"Unsupported file type: {file_ext}. Please use PDF, DOCX, MD, or TXT."
+        print(message)
+        return False, message
 
     if not full_text.strip():
-        print("No text found in PDF.")
-        return
+        message = "No text found in file."
+        print(message)
+        return False, message
 
     print(f"Extracted {len(full_text)} characters. Chunking text...")
     chunks = chunk_text(full_text)
@@ -182,4 +189,6 @@ def import_pdf(campaign_name: str, pdf_path: str):
     append_to_file("npcs.md", combined_npcs)
     append_to_file("state.md", combined_state)
 
-    print(f"Successfully imported data into campaign '{campaign_name}'.")
+    message = f"Successfully imported data into campaign '{campaign_name}'."
+    print(message)
+    return True, message

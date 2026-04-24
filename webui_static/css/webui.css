@@ -253,6 +253,12 @@ svg {
   gap: var(--space-lg);
 }
 
+.stage-side-stack {
+  display: grid;
+  gap: var(--space-lg);
+  align-content: start;
+}
+
 .panel-head {
   display: flex;
   justify-content: space-between;
@@ -282,6 +288,9 @@ svg {
 
 .campaign-card,
 .empty-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
   padding: var(--space-lg);
 }
 
@@ -293,12 +302,13 @@ svg {
 }
 
 .card-copy {
-  margin: var(--space-md) 0;
+  margin: 0;
 }
 
 .card-actions {
   display: flex;
   justify-content: flex-start;
+  padding-top: var(--space-sm);
 }
 
 .button {
