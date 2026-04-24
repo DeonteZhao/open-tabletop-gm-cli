@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Open Tabletop GM{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Doto:wght@400..700&family=Space+Grotesk:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/webui.css', v=asset_version) }}">
+    {% block head %}{% endblock %}
+  </head>
+  <body data-sprite-url="{{ url_for('static', filename='icons/sprite.svg') }}">
+    {% block body %}{% endblock %}
+    <script id="webui-state" type="application/json">{{ snapshot | tojson }}</script>
+    <script src="{{ url_for('static', filename='js/app.js', v=asset_version) }}" defer></script>
+  </body>
+</html>

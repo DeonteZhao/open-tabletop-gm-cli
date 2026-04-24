@@ -1,0 +1,20 @@
+{% for message in snapshot.chat_history %}
+  <article class="chat-message {{ message.role }}">
+    <p class="eyebrow">
+      <svg class="icon icon-xs" aria-hidden="true">
+        <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-{{ 'user' if message.role == 'user' else 'spark' }}"></use>
+      </svg>
+      <span>{{ "玩家输入" if message.role == "user" else "AI GM" }}</span>
+    </p>
+    <div class="message-body">{{ message.content | replace('\n', '<br>') | safe }}</div>
+  </article>
+{% else %}
+  <article class="empty-card chat-empty">
+    <p class="eyebrow">待机</p>
+    <svg class="icon icon-empty" aria-hidden="true">
+      <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-chat"></use>
+    </svg>
+    <h3>尚未进入战役</h3>
+    <p class="card-copy">加载战役后会在这里显示开场白与后续聊天记录。</p>
+  </article>
+{% endfor %}

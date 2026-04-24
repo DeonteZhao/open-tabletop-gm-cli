@@ -1,0 +1,46 @@
+{% for campaign in snapshot.campaigns %}
+  <article class="campaign-card" data-campaign="{{ campaign.name }}">
+    <div class="card-header">
+      <div>
+        <p class="eyebrow">战役</p>
+        <h3>{{ campaign.name }}</h3>
+      </div>
+      <span class="chip">
+        <svg class="icon icon-xs" aria-hidden="true">
+          <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-{{ 'shield' if campaign.system == 'dnd5e' else 'brain' }}"></use>
+        </svg>
+        <span>{{ campaign.system_label }}</span>
+      </span>
+    </div>
+    <p class="card-copy">{{ campaign.tagline }}</p>
+    <div class="resource-meter" aria-hidden="true">
+      <span class="segment filled"></span>
+      <span class="segment filled"></span>
+      <span class="segment filled"></span>
+      <span class="segment filled"></span>
+      <span class="segment filled"></span>
+      <span class="segment filled"></span>
+      <span class="segment"></span>
+      <span class="segment"></span>
+      <span class="segment"></span>
+      <span class="segment"></span>
+    </div>
+    <div class="card-actions">
+      <button class="button secondary" type="button" data-action="load-campaign" data-campaign="{{ campaign.name }}">
+        <svg class="icon" aria-hidden="true">
+          <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-door"></use>
+        </svg>
+        <span>进入游戏室</span>
+      </button>
+    </div>
+  </article>
+{% else %}
+  <article class="empty-card">
+    <p class="eyebrow">空状态</p>
+    <svg class="icon icon-empty" aria-hidden="true">
+      <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-book-open"></use>
+    </svg>
+    <h3>暂无战役</h3>
+    <p class="card-copy">先创建一个 D&D 5E 或 CoC 7E 战役，布局会自动切换到对应系统语义。</p>
+  </article>
+{% endfor %}

@@ -1,0 +1,33 @@
+# Tasks
+- [x] Task 1: 评估并确定可承载新布局的 UI 技术方案
+  - [x] SubTask 1.1: 审核当前 `webui.py`/Gradio 结构对页面级布局、静态资源和图标注入的限制
+  - [x] SubTask 1.2: 确定继续使用 Gradio 还是迁移到模板化 Web UI，并记录理由
+- [x] Task 2: 建立新的页面信息架构与布局骨架
+  - [x] SubTask 2.1: 重构战役大厅布局，拆分导航区、主内容区、状态区
+  - [x] SubTask 2.2: 重构游戏室布局，提供叙事主舞台、输入控制区、角色/调查员侧栏
+  - [x] SubTask 2.3: 重构配置区布局，使其符合统一表单和面板结构
+- [x] Task 3: 按设计系统落地核心组件
+  - [x] SubTask 3.1: 实现导航、按钮、输入框、标签、分段控件、面板等基础组件样式
+  - [x] SubTask 3.2: 实现聊天区、状态栏、资源条、空状态和加载状态的统一样式
+  - [x] SubTask 3.3: 为 D&D 5e 与 CoC 7E 提供必要的差异化展示模块
+- [x] Task 4: 统一图标与矢量图形系统
+  - [x] SubTask 4.1: 确定统一图标来源与使用方式，遵守单线图标规则
+  - [x] SubTask 4.2: 将导航、动作按钮、状态标签、规则入口替换为一致的图标体系
+  - [x] SubTask 4.3: 为点阵装饰、分隔、空状态或系统标识补充统一矢量图形
+- [x] Task 4A: 补齐双系统模块与图标覆盖缺口
+  - [x] SubTask 4A.1: 为 D&D 5e 与 CoC 7E 增加更明确的专属界面模块与状态表达
+  - [x] SubTask 4A.2: 将动作按钮、状态标签与规则入口补齐到统一图标体系
+- [x] Task 4B: 强化双系统专属组件形态
+  - [x] SubTask 4B.1: 为 CoC 7E 提供更明确的理智、调查和 d100 语义组件
+  - [x] SubTask 4B.2: 为 D&D 5e 提供更明确的战斗、资源和行动语义组件
+- [ ] Task 5: 验证、预览与交付
+  - [x] SubTask 5.1: 本地启动 Web UI 并核对主要页面布局
+  - [x] SubTask 5.2: 检查图标、字体、间距、颜色与系统语义是否一致
+  - [ ] SubTask 5.3: 提交代码并推送到 GitHub
+
+# Task Dependencies
+- [Task 2] depends on [Task 1]
+- [Task 3] depends on [Task 2]
+- [Task 4] depends on [Task 2]
+- [Task 5] depends on [Task 3]
+- [Task 5] depends on [Task 4]

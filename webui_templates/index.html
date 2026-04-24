@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+
+{% block title %}Open Tabletop GM Web UI{% endblock %}
+
+{% block body %}
+  {% set system_meta = snapshot.system_meta %}
+  <div class="shell">
+    <aside class="nav-rail">
+      <div class="brand-lockup">
+        <div class="brand-mark">
+          <svg class="icon icon-lg" aria-hidden="true">
+            <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-logo"></use>
+          </svg>
+        </div>
+        <div>
+          <p class="eyebrow">Open Tabletop GM</p>
+          <h1>暗室控制台</h1>
+        </div>
+      </div>
+
+      <nav class="view-nav" aria-label="主导航">
+        <button class="nav-link is-active" type="button" data-view-target="campaigns">
+          <svg class="icon" aria-hidden="true">
+            <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-campaign"></use>
+          </svg>
+          <span>战役大厅</span>
+        </button>
+        <button class="nav-link" type="button" data-view-target="chat">
+          <svg class="icon" aria-hidden="true">
+            <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-chat"></use>
+          </svg>
+          <span>游戏室</span>
+        </button>
+        <button class="nav-link" type="button" data-view-target="config">
+          <svg class="icon" aria-hidden="true">
+            <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-config"></use>
+          </svg>
+          <span>配置管理</span>
+        </button>
+      </nav>
+
+      <section class="nav-panel">
+        <p class="eyebrow">状态</p>
+        <div class="status-ledger">
+          <div>
+            <span class="ledger-label">当前战役</span>
+            <strong id="status-campaign">{{ snapshot.current_campaign.name if snapshot.current_campaign else "未载入" }}</strong>
+          </div>
+          <div>
+            <span class="ledger-label">规则系统</span>
+            <strong id="status-system">{{ snapshot.current_campaign.system_label if snapshot.current_campaign else "待选择" }}</strong>
+          </div>
+          <div>
+            <span class="ledger-label">会话状态</span>
+            <strong id="status-ready">{{ "在线" if snapshot.chat_ready else "待命" }}</strong>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <main class="workspace">
+      <section class="view-stage is-active" data-view="campaigns">
+        <header class="stage-header">
+          <div>
+            <p class="eyebrow">战役大厅</p>
+            <h2>管理存档与系统入口</h2>
+          </div>
+          <p class="stage-copy">保留创建、列表与载入能力，同时换成可扩展的模板化布局。</p>
+        </header>
+
+        <div class="stage-grid">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">现有战役</p>
+                <h3>Campaign Registry</h3>
+              </div>
+              <span class="chip" id="campaign-count">{{ snapshot.campaigns | length }} 个项目</span>
+            </div>
+            <div class="campaign-grid" id="campaign-grid">
+              {% include "partials/campaign_cards.html" %}
+            </div>
+          </section>
+
+          <section class="panel panel-form">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">创建</p>
+                <h3>New Campaign</h3>
+              </div>
+            </div>
+            <form id="campaign-form" class="form-stack">
+              <label class="field">
+                <span>战役名称</span>
+                <input id="campaign-name" name="name" type="text" placeholder="例如：迷雾镇冒险">
+              </label>
+              <label class="field">
+                <span>规则系统</span>
+                <select id="campaign-system" name="system">
+                  {% for key, system in systems.items() %}
+                    <option value="{{ key }}">{{ system.label }} / {{ system.tagline }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <button class="button primary" type="submit">
+                <svg class="icon" aria-hidden="true">
+                  <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-plus"></use>
+                </svg>
+                <span>创建战役</span>
+              </button>
+            </form>
+          </section>
+        </div>
+      </section>
+
+      <section class="view-stage" data-view="chat">
+        <header class="stage-header">
+          <div>
+            <p class="eyebrow">游戏室</p>
+            <h2>叙事主舞台与聊天控制台</h2>
+          </div>
+          <p class="stage-copy">保留 AI GM 聊天能力，提供主舞台、输入区与系统侧栏。</p>
+        </header>
+
+        <div class="chat-layout">
+          <section class="panel narrative-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">当前会话</p>
+                <h3 id="chat-campaign">{{ snapshot.current_campaign.name if snapshot.current_campaign else "等待载入战役" }}</h3>
+              </div>
+              <span class="chip" id="chat-system">{{ snapshot.current_campaign.system_label if snapshot.current_campaign else "SYSTEM OFFLINE" }}</span>
+            </div>
+
+            <div class="chat-log" id="chat-log">
+              {% include "partials/chat_log.html" %}
+            </div>
+
+            <form id="chat-form" class="chat-composer">
+              <label class="field grow">
+                <span>你的行动</span>
+                <textarea id="chat-input" name="message" rows="4" placeholder="输入你想做的事情，例如：我环顾四周，检查桌上的手稿。"></textarea>
+              </label>
+              <button class="button primary" id="chat-submit" type="submit">
+                <svg class="icon" aria-hidden="true">
+                  <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-send"></use>
+                </svg>
+                <span>发送行动</span>
+              </button>
+            </form>
+          </section>
+
+          <aside class="system-column">
+            <section class="panel system-panel system-panel-{{ system_meta.theme }}" id="module-panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">系统模块</p>
+                  <h3 id="module-title">{{ snapshot.system_meta.label }}</h3>
+                </div>
+                <svg class="icon panel-icon" id="module-icon" aria-hidden="true">
+                  <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-{{ system_meta.module_icon }}"></use>
+                </svg>
+              </div>
+              <p class="panel-copy" id="module-tagline">{{ snapshot.system_meta.tagline }}</p>
+              <div class="meter-block">
+                <div class="meter-meta">
+                  <span id="module-resource-label">{{ snapshot.system_meta.resource_label }}</span>
+                  <strong id="module-resource-value">{{ snapshot.system_meta.resource_value }}</strong>
+                </div>
+                <div class="resource-meter" id="module-resource-meter" data-ratio="{{ snapshot.system_meta.resource_ratio }}"></div>
+              </div>
+              <div class="insight-card" id="system-insight">
+                <p class="eyebrow" id="module-insight-label">{{ snapshot.system_meta.insight_label }}</p>
+                <p id="module-insight-value">{{ snapshot.system_meta.insight_value }}</p>
+              </div>
+              <div class="specialized-system-block" id="specialized-system-block">
+                {% if system_meta.specialized_panel %}
+                  {% set panel = system_meta.specialized_panel %}
+                  {% if panel.kind == "dnd5e" %}
+                    <section class="specialized-panel specialized-panel-dnd">
+                      <div class="specialized-panel-head">
+                        <div>
+                          <p class="eyebrow">{{ panel.eyebrow }}</p>
+                          <h4>{{ panel.title }}</h4>
+                        </div>
+                        <svg class="icon" aria-hidden="true">
+                          <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-swords"></use>
+                        </svg>
+                      </div>
+                      <p class="card-copy">{{ panel.summary }}</p>
+                      <div class="battle-stat-grid">
+                        {% for stat in panel.battle_stats %}
+                          <div class="battle-stat-card">
+                            <span class="feature-stat-label">
+                              <svg class="icon icon-xs" aria-hidden="true">
+                                <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-{{ stat.icon }}"></use>
+                              </svg>
+                              <span>{{ stat.label }}</span>
+                            </span>
+                            <strong>{{ stat.value }}</strong>
+                          </div>
+                        {% endfor %}
+                      </div>
+                      <div class="resource-track-stack">
+                        {% for track in panel.resource_tracks %}
+                          <div class="resource-track-card">
+                            <div class="meter-meta">
+                              <span>
+                                <svg class="icon icon-xs" aria-hidden="true">
+                                  <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-{{ track.icon }}"></use>
+                                </svg>
+                                <span>{{ track.label }}</span>
+                              </span>
+                              <strong>{{ track.value }}</strong>
+                            </div>
+                            <div class="resource-meter {{ track.tone }} compact">
+                              {% for _ in range(track.filled) %}
+                                <span class="segment filled"></span>
+                              {% endfor %}
+                              {% for _ in range(track.segments - track.filled) %}
+                                <span class="segment"></span>
+                              {% endfor %}
+                            </div>
+                          </div>
+                        {% endfor %}
+                      </div>
+                      <div class="action-lane">
+                        <p class="eyebrow">行动经济</p>
+                        {% for action in panel.action_steps %}
+                          <div class="action-lane-row">
+                            <span class="feature-stat-label">
+                              <svg class="icon icon-xs" aria-hidden="true">
+                                <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-{{ action.icon }}"></use>
+                              </svg>
+                              <span>{{ action.label }}</span>
+                            </span>
+                            <strong>{{ action.detail }}</strong>
+                          </div>
+                        {% endfor %}
+                      </div>
+                    </section>
+                  {% elif panel.kind == "coc7e" %}
+                    <section class="specialized-panel specialized-panel-coc">
+                      <div class="specialized-panel-head">
+                        <div>
+                          <p class="eyebrow">{{ panel.eyebrow }}</p>
+                          <h4>{{ panel.title }}</h4>
+                        </div>
+                        <svg class="icon" aria-hidden="true">
+                          <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-brain"></use>
+                        </svg>
+                      </div>
+                      <p class="card-copy">{{ panel.summary }}</p>
+                      <div class="sanity-fuse-card">
+                        <div class="meter-meta">
+                          <span>
+                            <svg class="icon icon-xs" aria-hidden="true">
+                              <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-brain"></use>
+                            </svg>
+                            <span>{{ panel.sanity.label }}</span>
+                          </span>
+                          <strong>{{ panel.sanity.current }} / {{ panel.sanity.max }}</strong>
+                        </div>
+                        {% set filled = ((panel.sanity.current / panel.sanity.max) * 10) | round(0, 'common') | int %}
+                        {% set erosion = ((panel.sanity.erosion / 100) * 10) | round(0, 'common') | int %}
+                        <div class="resource-meter sanity fuse">
+                          {% for idx in range(10) %}
+                            {% if idx < filled %}
+                              <span class="segment filled"></span>
+                            {% elif idx >= 10 - erosion %}
+                              <span class="segment insanity"></span>
+                            {% else %}
+                              <span class="segment"></span>
+                            {% endif %}
+                          {% endfor %}
+                        </div>
+                        <p class="sanity-footnote">Mythos {{ panel.sanity.erosion }}% / Breakpoint {{ panel.sanity.breakpoint }}</p>
+                      </div>
+                      <div class="d100-check-card">
+                        <p class="eyebrow">d100 检定</p>
+                        <div class="d100-head">
+                          <strong>{{ panel.d100_check.skill }}</strong>
+                          <span class="chip chip-tone-success">{{ panel.d100_check.outcome }}</span>
+                        </div>
+                        <div class="d100-roll">
+                          <span class="d100-digit">{{ panel.d100_check.tens }}</span>
+                          <span class="d100-digit">{{ panel.d100_check.ones }}</span>
+                        </div>
+                        <p class="d100-footnote">
+                          Target ≤ {{ panel.d100_check.target }} / Hard ≤ {{ panel.d100_check.hard }} / Extreme ≤ {{ panel.d100_check.extreme }}
+                        </p>
+                      </div>
+                      <div class="clue-chain">
+                        <p class="eyebrow">调查链路</p>
+                        <div class="chip-grid">
+                          {% for clue in panel.clue_chain %}
+                            <span class="chip chip-tone-{{ clue.tone }}">
+                              <svg class="icon icon-xs" aria-hidden="true">
+                                <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-{{ clue.icon }}"></use>
+                              </svg>
+                              <span>{{ clue.label }}</span>
+                            </span>
+                          {% endfor %}
+                        </div>
+                      </div>
+                    </section>
+                  {% endif %}
+                {% endif %}
+              </div>
+              <div class="system-module-grid" id="feature-modules">
+                {% for module in system_meta.feature_modules %}
+                  <article class="feature-module-card tone-{{ system_meta.theme }}">
+                    <div class="feature-module-head">
+                      <div>
+                        <p class="eyebrow">{{ module.eyebrow }}</p>
+                        <h4>{{ module.title }}</h4>
+                      </div>
+                      <svg class="icon" aria-hidden="true">
+                        <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-{{ module.icon }}"></use>
+                      </svg>
+                    </div>
+                    <p class="card-copy">{{ module.description }}</p>
+                    <div class="feature-stat-list">
+                      {% for stat in module.stats %}
+                        <div class="feature-stat tone-{{ stat.tone }}">
+                          <span class="feature-stat-label">
+                            <svg class="icon icon-xs" aria-hidden="true">
+                              <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-{{ stat.icon }}"></use>
+                            </svg>
+                            <span>{{ stat.label }}</span>
+                          </span>
+                          <strong>{{ stat.value }}</strong>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </article>
+                {% endfor %}
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">动作按钮</p>
+                  <h3>Action Relay</h3>
+                </div>
+              </div>
+              <div class="action-grid" id="quick-actions">
+                {% for action in system_meta.quick_actions %}
+                  <button class="button {{ action.variant }}" type="button">
+                    <svg class="icon" aria-hidden="true">
+                      <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-{{ action.icon }}"></use>
+                    </svg>
+                    <span>{{ action.label }}</span>
+                  </button>
+                {% endfor %}
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">状态标签</p>
+                  <h3>Signal Tags</h3>
+                </div>
+              </div>
+              <div class="chip-grid" id="status-tags">
+                {% for tag in system_meta.status_tags %}
+                  <span class="chip chip-tone-{{ tag.tone }}">
+                    <svg class="icon icon-xs" aria-hidden="true">
+                      <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-{{ tag.icon }}"></use>
+                    </svg>
+                    <span>{{ tag.label }}</span>
+                  </span>
+                {% endfor %}
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">规则入口</p>
+                  <h3>Rule Access</h3>
+                </div>
+              </div>
+              <div class="rule-grid" id="rule-entries">
+                {% for rule in system_meta.rule_entries %}
+                  <article class="rule-entry">
+                    <div class="rule-entry-head">
+                      <svg class="icon" aria-hidden="true">
+                        <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-{{ rule.icon }}"></use>
+                      </svg>
+                      <strong>{{ rule.title }}</strong>
+                    </div>
+                    <p>{{ rule.detail }}</p>
+                  </article>
+                {% endfor %}
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">运行状态</p>
+                  <h3>Session Trace</h3>
+                </div>
+                <svg class="icon" aria-hidden="true">
+                  <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-pulse"></use>
+                </svg>
+              </div>
+              <p class="panel-copy" id="status-message">{{ snapshot.status_message }}</p>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view-stage" data-view="config">
+        <header class="stage-header">
+          <div>
+            <p class="eyebrow">配置管理</p>
+            <h2>保存 LLM 连接参数</h2>
+          </div>
+          <p class="stage-copy">继续复用 `config.py` 的读写逻辑，通过表单更新配置文件。</p>
+        </header>
+
+        <div class="stage-grid">
+          <section class="panel panel-form">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">模型设置</p>
+                <h3>Connection Profile</h3>
+              </div>
+              <svg class="icon" aria-hidden="true">
+                <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-config"></use>
+              </svg>
+            </div>
+            <form id="config-form" class="form-stack">
+              <label class="field">
+                <span>API Key</span>
+                <input id="config-api-key" name="api_key" type="password" value="{{ snapshot.config.api_key }}" placeholder="sk-...">
+              </label>
+              <label class="field">
+                <span>Base URL</span>
+                <input id="config-base-url" name="base_url" type="text" value="{{ snapshot.config.base_url }}" placeholder="https://api.openai.com/v1">
+              </label>
+              <label class="field">
+                <span>Model</span>
+                <input id="config-model" name="model" type="text" value="{{ snapshot.config.model }}" placeholder="gpt-4o">
+              </label>
+              <button class="button primary" type="submit">
+                <svg class="icon" aria-hidden="true">
+                  <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-save"></use>
+                </svg>
+                <span>保存配置</span>
+              </button>
+            </form>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">目标文件</p>
+                <h3>Config Path</h3>
+              </div>
+            </div>
+            <p class="panel-copy mono">{{ snapshot.config.config_path }}</p>
+            <div class="status-ledger compact">
+              <div>
+                <span class="ledger-label">布局引擎</span>
+                <strong>Flask + Jinja</strong>
+              </div>
+              <div>
+                <span class="ledger-label">静态资源</span>
+                <strong>CSS / JS / SVG</strong>
+              </div>
+              <div>
+                <span class="ledger-label">业务能力</span>
+                <strong>配置 / 战役 / 聊天</strong>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+{% endblock %}
