@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-dice.py — D&D 5e dice roller
+dice.py — D&D 5e & CoC 7e dice roller
 
 Usage:
     python3 dice.py <notation> [--silent]
@@ -15,11 +15,14 @@ Notation supported:
     d20 dis           disadvantage: roll twice, take lower
     d20+3 adv         advantage with modifier
     2d6+3             multiple dice + modifier
+    d100 b1           CoC 7e: 1 Bonus Die
+    d100 p2           CoC 7e: 2 Penalty Dice
 
 Output (unless --silent):
     Rolls: [x, x, x]  →  Total: N
     For advantage/disadvantage, shows both rolls and which was taken.
     Flags natural 20 (CRITICAL HIT) and natural 1 (FUMBLE) on single d20s.
+    Flags natural 1 (CRITICAL SUCCESS) and natural 100 (FUMBLE) on single d100s.
 """
 
 import random
@@ -28,13 +31,24 @@ import sys
 
 
 def parse_notation(notation: str):
-    """Parse dice notation string. Returns (num_dice, die_size, modifier, keep_mode, keep_count)."""
+    """Parse dice notation string. Returns (num_dice, die_size, modifier, keep_mode, keep_count, adv, dis, bonus_dice, penalty_dice)."""
     notation = notation.strip().lower()
 
     # Strip advantage/disadvantage suffix
     adv = "adv" in notation or "advantage" in notation
     dis = "dis" in notation or "disadvantage" in notation
     notation = re.sub(r'\s*(adv|dis|advantage|disadvantage)\w*', '', notation).strip()
+    
+    # Strip CoC bonus/penalty dice suffix (e.g., b1, p2)
+    bonus_dice = 0
+    penalty_dice = 0
+    bp_match = re.search(r'\s*(b|p)(\d+)', notation)
+    if bp_match:
+        if bp_match.group(1) == 'b':
+            bonus_dice = int(bp_match.group(2))
+        else:
+            penalty_dice = int(bp_match.group(2))
+        notation = re.sub(r'\s*(b|p)\d+', '', notation).strip()
 
     # Match: [N]d[S][kh/kl N][+/-M]
     pattern = r'^(\d*)d(\d+)(?:(kh|kl)(\d+))?([+-]\d+)?$'
@@ -48,7 +62,7 @@ def parse_notation(notation: str):
     keep_count = int(m.group(4)) if m.group(4) else None
     modifier = int(m.group(5)) if m.group(5) else 0
 
-    return num_dice, die_size, modifier, keep_mode, keep_count, adv, dis
+    return num_dice, die_size, modifier, keep_mode, keep_count, adv, dis, bonus_dice, penalty_dice
 
 
 def roll_dice(num_dice, die_size):
@@ -62,7 +76,34 @@ def format_modifier(mod):
 
 
 def run(notation: str, silent: bool = False) -> int:
-    num_dice, die_size, modifier, keep_mode, keep_count, adv, dis = parse_notation(notation)
+    num_dice, die_size, modifier, keep_mode, keep_count, adv, dis, bonus_dice, penalty_dice = parse_notation(notation)
+
+    # CoC 7e Bonus / Penalty dice (only meaningful for d100)
+    if (bonus_dice > 0 or penalty_dice > 0) and die_size == 100 and num_dice == 1:
+        # Roll units digit (1-10, where 10 is 0)
+        units = random.randint(1, 10)
+        units_val = 0 if units == 10 else units
+        
+        # Roll tens digit(s) (00, 10, ..., 90)
+        num_tens_dice = 1 + bonus_dice + penalty_dice
+        tens_rolls = [(random.randint(1, 10) % 10) * 10 for _ in range(num_tens_dice)]
+        
+        # Combine units and tens (00 + 0 = 100)
+        combined_rolls = [tens + units_val if tens + units_val > 0 else 100 for tens in tens_rolls]
+        
+        if bonus_dice > 0:
+            chosen = min(combined_rolls)
+            label = f"Bonus Dice ({bonus_dice})"
+        else:
+            chosen = max(combined_rolls)
+            label = f"Penalty Dice ({penalty_dice})"
+            
+        if not silent:
+            print(f"[{label}] Units roll: {units_val}")
+            print(f"[{label}] Tens rolls: {tens_rolls}")
+            print(f"[{label}] Possible results: {combined_rolls}")
+            print(f"Takes roll → Total: {chosen}")
+        return chosen
 
     # Advantage / disadvantage (only meaningful for single d20)
     if adv or dis:
@@ -104,6 +145,15 @@ def run(notation: str, silent: bool = False) -> int:
                 flag = "  *** CRITICAL HIT (nat 20)! ***"
             elif raw == 1:
                 flag = "  *** FUMBLE (nat 1)! ***"
+            mod_str = format_modifier(modifier)
+            print(f"Roll: {raw}{mod_str} = {result}{flag}")
+        elif num_dice == 1 and die_size == 100:
+            raw = rolls[0]
+            flag = ""
+            if raw == 1:
+                flag = "  *** CRITICAL SUCCESS (nat 1)! ***"
+            elif raw == 100:
+                flag = "  *** FUMBLE (nat 100)! ***"
             mod_str = format_modifier(modifier)
             print(f"Roll: {raw}{mod_str} = {result}{flag}")
         else:

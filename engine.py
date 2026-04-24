@@ -40,8 +40,18 @@ class Engine:
         if skill_path.exists():
             prompt_parts.append(skill_path.read_text(encoding="utf-8"))
             
-        # 2. System rules (e.g. dnd5e)
-        system_path = Path(get_project_root()) / "systems" / "dnd5e" / "system.md"
+        # 2. System rules (e.g. dnd5e or coc7e)
+        system_name = "dnd5e"
+        campaign_config_path = self.campaign_path / "campaign.json"
+        if campaign_config_path.exists():
+            try:
+                with open(campaign_config_path, "r", encoding="utf-8") as f:
+                    camp_config = json.load(f)
+                    system_name = camp_config.get("system", "dnd5e")
+            except Exception:
+                pass
+                
+        system_path = Path(get_project_root()) / "systems" / system_name / "system.md"
         if system_path.exists():
             prompt_parts.append(system_path.read_text(encoding="utf-8"))
             
@@ -78,11 +88,11 @@ class Engine:
                 "type": "function",
                 "function": {
                     "name": "dice",
-                    "description": "Roll dice for checks, attacks, or damage (e.g., 1d20+5, 2d6). Set silent=True for secret rolls.",
+                    "description": "Roll dice for checks, attacks, or damage (e.g., 1d20+5, 2d6). Supports CoC 7E bonus/penalty dice (e.g., d100 b1, d100 p2). Set silent=True for secret rolls.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "notation": { "type": "string", "description": "Dice expression (e.g., '1d20+3', '4d6kh3')" },
+                            "notation": { "type": "string", "description": "Dice expression (e.g., '1d20+3', '4d6kh3', 'd100 b1', 'd100 p2')" },
                             "silent": { "type": "boolean", "description": "If true, roll secretly" }
                         },
                         "required": ["notation"]

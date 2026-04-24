@@ -15,6 +15,7 @@ def main():
     # new
     new_parser = subparsers.add_parser("new", help="Create a new campaign")
     new_parser.add_argument("name", type=str, help="Name of the campaign")
+    new_parser.add_argument("--system", type=str, default="dnd5e", help="System rules to use (e.g. dnd5e, coc7e)")
 
     # list
     subparsers.add_parser("list", help="List all campaigns")
@@ -33,7 +34,7 @@ def main():
     if args.command == "config":
         interactive_config()
     elif args.command == "new":
-        create_campaign(args.name)
+        create_campaign(args.name, args.system)
     elif args.command == "list":
         list_campaigns()
     elif args.command == "load":
