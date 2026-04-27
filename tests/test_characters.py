@@ -32,6 +32,7 @@ class CharacterStorageTests(unittest.TestCase):
         self.assertEqual(characters.slugify_character_name("  "), "character")
 
     def test_save_and_list_character_records(self):
+        self.assertTrue(campaign.create_campaign("alpha", "dnd5e"))
         record = characters.build_dnd_character_record(
             "alpha",
             {
@@ -57,6 +58,54 @@ class CharacterStorageTests(unittest.TestCase):
         self.assertEqual(len(all_records), 1)
         self.assertEqual(all_records[0]["campaign"], "alpha")
         self.assertEqual(all_records[0]["details"]["class_display"], "战士")
+
+    def test_same_system_characters_are_shared_across_campaigns(self):
+        self.assertTrue(campaign.create_campaign("alpha", "dnd5e"))
+        self.assertTrue(campaign.create_campaign("beta", "dnd5e"))
+        record = characters.build_dnd_character_record(
+            "alpha",
+            {
+                "name": "Aldric",
+                "player_name": "Tester",
+                "race": "人类",
+                "class": "战士",
+                "background": "士兵",
+                "alignment": "Lawful Good",
+                "ability_method": "手动输入",
+                "scores": {"STR": 15, "DEX": 14, "CON": 13, "INT": 12, "WIS": 10, "CHA": 8},
+                "proficiencies": "运动, 求生",
+            },
+        )
+        saved = characters.save_character_record(record)
+
+        beta_records = characters.list_campaign_characters("beta")
+        self.assertEqual(len(beta_records), 1)
+        self.assertEqual(beta_records[0]["name"], "Aldric")
+        self.assertTrue(beta_records[0]["is_compatible_with_current_campaign"])
+        self.assertEqual(beta_records[0]["origin_campaign"], "alpha")
+        self.assertIn("characters\\dnd5e\\aldric.md", saved["sheet_path"])
+
+    def test_different_system_characters_are_not_reused(self):
+        self.assertTrue(campaign.create_campaign("alpha", "dnd5e"))
+        self.assertTrue(campaign.create_campaign("haunted", "coc7e"))
+        dnd_record = characters.build_dnd_character_record(
+            "alpha",
+            {
+                "name": "Aldric",
+                "player_name": "Tester",
+                "race": "人类",
+                "class": "战士",
+                "background": "士兵",
+                "alignment": "Lawful Good",
+                "ability_method": "手动输入",
+                "scores": {"STR": 15, "DEX": 14, "CON": 13, "INT": 12, "WIS": 10, "CHA": 8},
+                "proficiencies": "运动, 求生",
+            },
+        )
+        characters.save_character_record(dnd_record)
+
+        coc_records = characters.list_campaign_characters("haunted")
+        self.assertEqual(coc_records, [])
 
     def test_coc_character_helper_derives_stats(self):
         payload = coc_character.build_coc_character(

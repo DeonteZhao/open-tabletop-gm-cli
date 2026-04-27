@@ -10,11 +10,11 @@
       </div>
       <p class="card-copy">{{ character.summary }}</p>
       <div class="character-meta">
-        <span class="chip chip-tone-neutral">{{ character.campaign }}</span>
+        <span class="chip chip-tone-neutral">{{ character.origin_campaign or character.campaign }}</span>
         {% if character.is_compatible_with_current_campaign %}
-          <span class="chip chip-tone-success">当前战役可用</span>
+          <span class="chip chip-tone-success">当前规则可用</span>
         {% else %}
-          <span class="chip chip-tone-warning">仅限所属战役</span>
+          <span class="chip chip-tone-warning">规则不兼容</span>
         {% endif %}
       </div>
       <p class="field-hint">玩家：{{ character.player_name }} / 更新：{{ character.updated_at }}</p>

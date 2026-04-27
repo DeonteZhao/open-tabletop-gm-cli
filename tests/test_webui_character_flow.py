@@ -88,10 +88,13 @@ class WebUiCharacterFlowTests(unittest.TestCase):
         self.assertFalse(payload["state"]["character_guide"]["active"])
         self.assertEqual(payload["state"]["active_character"]["name"], "Aldric")
         self.assertEqual(payload["state"]["my_characters"][0]["name"], "Aldric")
+        self.assertEqual(payload["state"]["system_meta"]["resource_value"], "11 / 12 / +2")
+        self.assertIn("Aldric 作战面板", payload["state"]["system_meta"]["specialized_panel"]["title"])
         self.assertIn("开场：Aldric 进入冒险。", payload["message"])
 
     def test_load_campaign_with_existing_character_prompts_reuse(self):
         self.assertTrue(campaign.create_campaign("alpha", "dnd5e"))
+        self.assertTrue(campaign.create_campaign("beta", "dnd5e"))
         summary = characters.save_character_record(
             characters.build_dnd_character_record(
                 "alpha",
@@ -110,13 +113,75 @@ class WebUiCharacterFlowTests(unittest.TestCase):
         )
         self.assertEqual(summary["name"], "Vesper")
 
-        payload = self.client.post("/api/campaigns/load", json={"name": "alpha"}).get_json()
+        payload = self.client.post("/api/campaigns/load", json={"name": "beta"}).get_json()
         self.assertEqual(payload["state"]["character_guide"]["state"], "choose_existing")
         self.assertIn("是否使用已有角色", payload["state"]["chat_history"][0]["content"])
+        self.assertEqual(payload["state"]["campaign_characters"][0]["origin_campaign"], "alpha")
 
         reply = self.client.post("/api/chat", json={"message": "是"}).get_json()
         self.assertFalse(reply["state"]["character_guide"]["active"])
         self.assertEqual(reply["state"]["active_character"]["name"], "Vesper")
+
+    def test_coc_active_character_updates_system_panel(self):
+        self.assertTrue(campaign.create_campaign("haunted", "coc7e"))
+        self.assertTrue(campaign.create_campaign("haunted-2", "coc7e"))
+        summary = characters.save_character_record(
+            characters.build_coc_character_record(
+                "haunted",
+                {
+                    "name": "Harvey Walters",
+                    "player_name": "Tester",
+                    "era": "1920年代",
+                    "occupation": "私家侦探",
+                    "age": "35",
+                    "scores": {
+                        "STR": 60,
+                        "CON": 50,
+                        "SIZ": 60,
+                        "DEX": 55,
+                        "APP": 60,
+                        "INT": 75,
+                        "POW": 70,
+                        "EDU": 70,
+                    },
+                    "skills_summary": "图书馆使用 70，侦查 60",
+                    "backstory": "总在追查怪事的侦探。",
+                },
+            )
+        )
+        self.assertEqual(summary["name"], "Harvey Walters")
+
+        payload = self.client.post("/api/campaigns/load", json={"name": "haunted-2"}).get_json()
+        self.assertEqual(payload["state"]["character_guide"]["state"], "choose_existing")
+
+        reply = self.client.post("/api/chat", json={"message": "是"}).get_json()
+        self.assertEqual(reply["state"]["system_meta"]["resource_value"], "70 / 11 / 14")
+        self.assertIn("1920年代 / 私家侦探", reply["state"]["system_meta"]["insight_value"])
+        self.assertEqual(reply["state"]["system_meta"]["specialized_panel"]["sanity"]["current"], 70)
+
+    def test_cross_system_campaign_does_not_offer_incompatible_character(self):
+        self.assertTrue(campaign.create_campaign("alpha", "dnd5e"))
+        self.assertTrue(campaign.create_campaign("haunted", "coc7e"))
+        characters.save_character_record(
+            characters.build_dnd_character_record(
+                "alpha",
+                {
+                    "name": "Aldric",
+                    "player_name": "Tester",
+                    "race": "人类",
+                    "class": "战士",
+                    "background": "士兵",
+                    "alignment": "Lawful Good",
+                    "ability_method": "手动输入",
+                    "scores": {"STR": 15, "DEX": 14, "CON": 13, "INT": 12, "WIS": 10, "CHA": 8},
+                    "proficiencies": "运动, 求生",
+                },
+            )
+        )
+
+        payload = self.client.post("/api/campaigns/load", json={"name": "haunted"}).get_json()
+        self.assertEqual(payload["state"]["character_guide"]["state"], "create_character")
+        self.assertEqual(payload["state"]["campaign_characters"], [])
 
 
 if __name__ == "__main__":

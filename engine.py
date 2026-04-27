@@ -1,6 +1,8 @@
 import os
 import json
 from pathlib import Path
+
+from characters import list_system_characters, load_character_markdown_from_record
 from config import get_config
 from llm import create_llm_client
 from tools import execute_tool, get_project_root
@@ -53,11 +55,13 @@ class Engine:
                 content = filepath.read_text(encoding="utf-8")
                 prompt_parts.append(f"--- {filename} ---\n{content}\n")
 
-        characters_dir = self.campaign_path / "characters"
-        if characters_dir.exists():
-            for filepath in sorted(characters_dir.glob("*.md")):
-                content = filepath.read_text(encoding="utf-8")
-                prompt_parts.append(f"--- characters/{filepath.name} ---\n{content}\n")
+        for character in list_system_characters(system_name, self.campaign_name):
+            try:
+                content = load_character_markdown_from_record(character)
+            except FileNotFoundError:
+                continue
+            slug = str(character.get("slug", "")).strip() or character.get("name", "character")
+            prompt_parts.append(f"--- characters/{slug}.md ---\n{content}\n")
                 
         # 4. Global instructions
         prompt_parts.append(

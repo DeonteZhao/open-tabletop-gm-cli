@@ -5,6 +5,7 @@ import os
 import secrets
 import threading
 import tempfile
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -35,6 +36,7 @@ from characters import (
     generate_dnd_roll_arrays,
     list_all_characters,
     list_campaign_characters,
+    list_system_characters,
     normalize_dnd_ability_method,
     parse_stat_block,
     resolve_character_choice,
@@ -233,6 +235,127 @@ def _serialize_character_guide(state: SessionState) -> dict[str, object]:
     }
 
 
+def _find_preview_character(state: SessionState, campaign_characters: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if state.active_character_id:
+        for character in campaign_characters:
+            if character.get("id") == state.active_character_id:
+                return character
+    pending_record = state.guide_context.get("pending_record")
+    if isinstance(pending_record, dict):
+        return pending_record
+    return None
+
+
+def _build_dnd_system_meta(base_meta: dict[str, Any], character: dict[str, Any]) -> dict[str, Any]:
+    details = character.get("details") or {}
+    scores = details.get("scores") or {}
+    modifiers = details.get("modifiers") or {}
+    proficiencies = details.get("proficiencies") or []
+    hp = int(details.get("hp") or 0)
+    ac = int(details.get("armor_class") or 10)
+    proficiency_bonus = int(details.get("proficiency_bonus") or 2)
+    hit_die = int(details.get("hit_die") or 8)
+    class_display = str(details.get("class_display") or "冒险者")
+    race = str(details.get("race") or "未知种族")
+    background = str(details.get("background") or "未知背景")
+    system_meta = deepcopy(base_meta)
+    system_meta["resource_value"] = f"{hp} / {ac} / {modifiers.get('DEX', '+0')}"
+    system_meta["resource_ratio"] = 1
+    system_meta["insight_value"] = f"{race} / {class_display} / 背景：{background}"
+    system_meta["specialized_panel"] = {
+        "kind": "dnd5e",
+        "title": f"{character.get('name', '角色')} 作战面板",
+        "eyebrow": "当前角色",
+        "battle_stats": [
+            {"label": "Armor Class", "value": str(ac), "icon": "shield"},
+            {"label": "Initiative", "value": str(modifiers.get("DEX", "+0")), "icon": "zap"},
+            {"label": "Proficiency", "value": f"+{proficiency_bonus}", "icon": "star"},
+        ],
+        "resource_tracks": [
+            {
+                "label": "Hit Points",
+                "value": f"{hp} / {hp}",
+                "icon": "heart",
+                "segments": max(1, hp),
+                "filled": max(1, hp),
+                "tone": "heroic",
+            },
+            {
+                "label": "Skill Proficiencies",
+                "value": str(len(proficiencies)),
+                "icon": "scroll",
+                "segments": max(4, len(proficiencies) or 1),
+                "filled": max(0, len(proficiencies)),
+                "tone": "warning",
+            },
+        ],
+    }
+    if scores:
+        system_meta["insight_value"] = (
+            f"{race} / {class_display} / STR {scores.get('STR', '-')}"
+            f" DEX {scores.get('DEX', '-')} CON {scores.get('CON', '-')}"
+        )
+    return system_meta
+
+
+def _build_coc_system_meta(base_meta: dict[str, Any], character: dict[str, Any]) -> dict[str, Any]:
+    details = character.get("details") or {}
+    scores = details.get("scores") or {}
+    derived = details.get("derived") or {}
+    san = int(derived.get("san") or 0)
+    hp = int(derived.get("hp") or 0)
+    mp = int(derived.get("mp") or 0)
+    mov = int(derived.get("mov") or 0)
+    build = derived.get("build", 0)
+    damage_bonus = derived.get("damage_bonus", "0")
+    era = str(details.get("era") or "未知时代")
+    occupation = str(details.get("occupation") or "未知职业")
+    target = int(scores.get("INT") or scores.get("POW") or san or 50)
+    roll = min(99, max(1, target // 2 if target else 50))
+    system_meta = deepcopy(base_meta)
+    system_meta["resource_value"] = f"{san} / {hp} / {mp}"
+    system_meta["resource_ratio"] = 1 if san else 0
+    system_meta["insight_value"] = f"{era} / {occupation} / MOV {mov} / Build {build} / DB {damage_bonus}"
+    system_meta["specialized_panel"] = {
+        "kind": "coc7e",
+        "title": f"{character.get('name', '调查员')} 状态摘要",
+        "eyebrow": "当前角色",
+        "sanity": {
+            "label": "Sanity Fuse",
+            "current": san,
+            "max": san,
+            "erosion": 0,
+            "breakpoint": f"单次失去 5+ / 当日累计 {max(1, san // 5)}+",
+        },
+        "d100_check": {
+            "skill": "INT 灵感",
+            "target": target,
+            "roll": roll,
+            "tens": roll // 10,
+            "ones": roll % 10,
+            "outcome": "可用于常规成功阈值参考",
+            "hard": target // 2,
+            "extreme": target // 5,
+        },
+    }
+    return system_meta
+
+
+def _build_system_meta_for_state(
+    state: SessionState,
+    current_campaign: dict[str, Any] | None,
+    campaign_characters: list[dict[str, Any]],
+) -> dict[str, Any]:
+    system = state.campaign_system if current_campaign else "dnd5e"
+    base_meta = _get_system_meta(system)
+    preview_character = _find_preview_character(state, campaign_characters)
+    if not preview_character:
+        return base_meta
+    if system == "coc7e":
+        return _build_coc_system_meta(base_meta, preview_character)
+    return _build_dnd_system_meta(base_meta, preview_character)
+
+
 def _serialize_state() -> dict[str, object]:
     state = _get_session_state()
     config = get_config(prefer_env=False)
@@ -249,7 +372,7 @@ def _serialize_state() -> dict[str, object]:
             "system": state.campaign_system,
             "system_label": _get_system_meta(state.campaign_system)["label"],
         }
-        system_meta = _get_system_meta(state.campaign_system)
+        system_meta = _build_system_meta_for_state(state, current_campaign, campaign_characters)
     if state.active_character_name:
         active_character = {
             "id": state.active_character_id,
@@ -378,11 +501,11 @@ def _start_character_creation(state: SessionState) -> str:
     state.guide_context = {"system": state.campaign_system, "step": "name", "form": {"player_name": "玩家"}}
     if state.campaign_system == "coc7e":
         return (
-            "当前战役还没有可用角色，我们现在开始创建调查员。\n\n"
+            "当前还没有可用于这个 CoC 规则战役的调查员，我们现在开始创建调查员。\n\n"
             "第 1 步：请先输入角色姓名。"
         )
     return (
-        "当前战役还没有可用角色，我们现在开始创建角色。\n\n"
+        "当前还没有可用于这个 DND 规则战役的角色，我们现在开始创建角色。\n\n"
         "第 1 步：请先输入角色姓名。"
     )
 
@@ -390,8 +513,9 @@ def _start_character_creation(state: SessionState) -> str:
 def _start_existing_character_choice(state: SessionState) -> str:
     state.guide_state = "choose_existing"
     state.guide_context = {}
+    system_label = _get_system_meta(state.campaign_system)["label"]
     return (
-        "检测到这个战役已经有已创建角色。\n\n"
+        f"检测到你已经创建过可用于这个 {system_label} 战役的角色。\n\n"
         f"{_character_list_text(state.campaign_name)}\n\n"
         "是否使用已有角色？请输入“是”或“否”。"
     )
@@ -684,7 +808,7 @@ def load_selected_campaign(name: str) -> str:
     state.active_character_id = ""
     state.active_character_name = ""
     state.guide_context = {}
-    campaign_characters = list_campaign_characters(name)
+    campaign_characters = list_system_characters(state.campaign_system, name)
     if campaign_characters:
         guide_message = _start_existing_character_choice(state)
     else:

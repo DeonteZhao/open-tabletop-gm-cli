@@ -10,6 +10,8 @@
     apiKeyModified: false,
     loadingCampaignName: "",
     importingModule: false,
+    chatPending: false,
+    pendingUserMessage: "",
   };
   const CAMPAIGN_NAME_DISPLAY_LIMIT = 14;
 
@@ -401,8 +403,8 @@
     }
     if (elements.characterPanelCopy) {
       elements.characterPanelCopy.textContent = currentCampaign
-        ? `当前战役为 ${currentCampaign}。只有同战役角色可直接用于本次会话。`
-        : "当前未加载战役。加载后会标记哪些角色可直接用于当前会话。";
+        ? `当前战役为 ${currentCampaign}。所有同规则系统角色都可直接用于本次会话。`
+        : "当前未加载战役。加载后会标记哪些角色与当前规则系统兼容。";
     }
 
     if (!characters.length) {
@@ -430,8 +432,8 @@
           "</div>",
           `<p class="card-copy">${escapeHtml(character.summary || "")}</p>`,
           '<div class="character-meta">',
-          `<span class="chip chip-tone-neutral">${escapeHtml(character.campaign || "")}</span>`,
-          `<span class="chip ${compatible ? "chip-tone-success" : "chip-tone-warning"}">${compatible ? "当前战役可用" : "仅限所属战役"}</span>`,
+          `<span class="chip chip-tone-neutral">${escapeHtml(character.origin_campaign || character.campaign || "")}</span>`,
+          `<span class="chip ${compatible ? "chip-tone-success" : "chip-tone-warning"}">${compatible ? "当前规则可用" : "规则不兼容"}</span>`,
           "</div>",
           `<p class="field-hint">玩家：${escapeHtml(character.player_name || "")} / 更新：${escapeHtml(character.updated_at || "")}</p>`,
           "</article>",
@@ -444,8 +446,8 @@
     const history = Array.isArray(state.chat_history) ? state.chat_history : [];
     const isLoadingCampaign = Boolean(uiState.loadingCampaignName);
     const guide = state.character_guide || {};
-    elements.chatSubmit.disabled = !state.chat_ready || isLoadingCampaign;
-    elements.chatInput.disabled = !state.chat_ready || isLoadingCampaign;
+    elements.chatSubmit.disabled = !state.chat_ready || isLoadingCampaign || uiState.chatPending;
+    elements.chatInput.disabled = !state.chat_ready || isLoadingCampaign || uiState.chatPending;
     if (elements.saveCampaignButton) {
       elements.saveCampaignButton.disabled = !state.current_campaign;
     }
@@ -509,7 +511,7 @@
       return;
     }
 
-    elements.chatLog.innerHTML = history
+    const renderedMessages = history
       .map((message) => {
         const roleLabel = message.role === "user" ? "玩家输入" : "AI GM";
         const content = renderMarkdown(message.content);
@@ -519,8 +521,34 @@
           `<div class="message-body">${content}</div>`,
           "</article>",
         ].join("");
-      })
-      .join("");
+      });
+
+    if (uiState.pendingUserMessage) {
+      renderedMessages.push([
+        '<article class="chat-message user pending-user">',
+        `<p class="eyebrow">${renderIcon("user", "icon icon-xs")}<span>玩家输入</span></p>`,
+        `<div class="message-body"><p>${escapeHtml(uiState.pendingUserMessage)}</p></div>`,
+        "</article>",
+      ].join(""));
+    }
+
+    if (uiState.chatPending) {
+      const pendingTitle = guide.active ? "KP 正在阅读你的角色卡" : "KP 正在推演场景回应";
+      const pendingCopy = guide.active
+        ? "正在核对角色设定、属性与规则适配，并准备下一步建角引导。"
+        : "正在理解你的行动、推演结果，并生成新的场景叙事。";
+      const pendingClass = guide.active ? "is-guide-pending" : "is-scene-pending";
+      renderedMessages.push([
+        `<article class="chat-message assistant pending ${pendingClass}">`,
+        `<p class="eyebrow">${renderIcon("spark", "icon icon-xs")}<span>${pendingTitle}</span></p>`,
+        '<div class="message-body">',
+        `<p class="loading-copy">${escapeHtml(pendingCopy)} <span class="loading-dots"><span></span><span></span><span></span></span></p>`,
+        "</div>",
+        "</article>",
+      ].join(""));
+    }
+
+    elements.chatLog.innerHTML = renderedMessages.join("");
 
     elements.chatLog.scrollTop = elements.chatLog.scrollHeight;
   }
@@ -1000,14 +1028,23 @@
       return;
     }
 
-    elements.chatSubmit.disabled = true;
+    uiState.chatPending = true;
+    uiState.pendingUserMessage = message;
+    renderChat();
     try {
       const data = await postJson("/api/chat", { message });
+      uiState.chatPending = false;
+      uiState.pendingUserMessage = "";
       mergeState(data.state);
       elements.chatInput.value = "";
     } catch (error) {
+      uiState.chatPending = false;
+      uiState.pendingUserMessage = "";
       pushInlineStatus(error.message);
+      renderChat();
     } finally {
+      uiState.chatPending = false;
+      uiState.pendingUserMessage = "";
       elements.chatSubmit.disabled = !state.chat_ready;
     }
   });

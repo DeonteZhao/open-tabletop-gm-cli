@@ -108,13 +108,32 @@ def campaign_characters_dir(campaign_name: str) -> Path:
     return CAMPAIGNS_DIR / campaign_name / "characters"
 
 
+def shared_characters_root_dir() -> Path:
+    return CAMPAIGNS_DIR.parent / "characters"
+
+
+def system_characters_dir(system_name: str) -> Path:
+    return shared_characters_root_dir() / system_name
+
+
+def ensure_system_characters_dir(system_name: str) -> Path:
+    directory = system_characters_dir(system_name)
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
 def ensure_campaign_characters_dir(campaign_name: str) -> Path:
     directory = campaign_characters_dir(campaign_name)
     directory.mkdir(parents=True, exist_ok=True)
     return directory
 
 
-def _character_paths(campaign_name: str, slug: str) -> tuple[Path, Path]:
+def _shared_character_paths(system_name: str, slug: str) -> tuple[Path, Path]:
+    base = ensure_system_characters_dir(system_name) / slug
+    return base.with_suffix(".md"), base.with_suffix(".json")
+
+
+def _legacy_character_paths(campaign_name: str, slug: str) -> tuple[Path, Path]:
     base = ensure_campaign_characters_dir(campaign_name) / slug
     return base.with_suffix(".md"), base.with_suffix(".json")
 
@@ -127,11 +146,12 @@ def _read_json_file(path: Path) -> dict[str, Any] | None:
 
 
 def save_character_record(record: dict[str, Any]) -> dict[str, Any]:
-    campaign_name = str(record["campaign"])
+    system_name = str(record["system"])
     slug = str(record["slug"])
-    markdown_path, json_path = _character_paths(campaign_name, slug)
+    markdown_path, json_path = _shared_character_paths(system_name, slug)
     summary = dict(record)
     markdown = str(summary.pop("markdown"))
+    summary.setdefault("origin_campaign", summary.get("campaign", ""))
     summary["sheet_path"] = str(markdown_path)
     summary["json_path"] = str(json_path)
 
@@ -140,60 +160,145 @@ def save_character_record(record: dict[str, Any]) -> dict[str, Any]:
     return summary
 
 
-def load_character_summary(campaign_name: str, slug: str) -> dict[str, Any] | None:
-    _, json_path = _character_paths(campaign_name, slug)
+def _read_campaign_system(campaign_name: str) -> str | None:
+    config_path = CAMPAIGNS_DIR / campaign_name / "campaign.json"
+    if not config_path.exists():
+        return None
+    payload = _read_json_file(config_path)
+    if not payload:
+        return None
+    system_name = str(payload.get("system", "")).strip()
+    return system_name or None
+
+
+def _resolve_current_system(current_campaign_or_system: str | None = None) -> str | None:
+    value = (current_campaign_or_system or "").strip()
+    if not value:
+        return None
+    if value in {"dnd5e", "coc7e"}:
+        return value
+    return _read_campaign_system(value)
+
+
+def _load_character_summary_by_system(system_name: str, slug: str) -> dict[str, Any] | None:
+    _, json_path = _shared_character_paths(system_name, slug)
     payload = _read_json_file(json_path)
+    if payload:
+        return payload
+    for campaign_dir in sorted(CAMPAIGNS_DIR.iterdir()) if CAMPAIGNS_DIR.exists() else []:
+        if not campaign_dir.is_dir():
+            continue
+        _, legacy_json_path = _legacy_character_paths(campaign_dir.name, slug)
+        payload = _read_json_file(legacy_json_path)
+        if payload and payload.get("system") == system_name:
+            return payload
+    return None
+
+
+def load_character_summary(campaign_name: str, slug: str) -> dict[str, Any] | None:
+    system_name = _resolve_current_system(campaign_name)
+    if not system_name:
+        return None
+    payload = _load_character_summary_by_system(system_name, slug)
     if not payload:
         return None
     return _with_compatibility(payload, campaign_name)
 
 
 def load_character_markdown(campaign_name: str, slug: str) -> str:
-    markdown_path, _ = _character_paths(campaign_name, slug)
-    if not markdown_path.exists():
-        raise FileNotFoundError(f"角色卡不存在：{markdown_path}")
-    return markdown_path.read_text(encoding="utf-8")
+    summary = load_character_summary(campaign_name, slug)
+    if not summary:
+        raise FileNotFoundError(f"角色卡不存在：{slug}")
+    return load_character_markdown_from_record(summary)
+
+
+def load_character_markdown_from_record(record: dict[str, Any]) -> str:
+    candidates: list[Path] = []
+    sheet_path = str(record.get("sheet_path", "")).strip()
+    if sheet_path:
+        candidates.append(Path(sheet_path))
+    system_name = str(record.get("system", "")).strip()
+    slug = str(record.get("slug", "")).strip()
+    campaign_name = str(record.get("campaign", "")).strip()
+    if system_name and slug:
+        shared_markdown_path, _ = _shared_character_paths(system_name, slug)
+        candidates.append(shared_markdown_path)
+    if campaign_name and slug:
+        legacy_markdown_path, _ = _legacy_character_paths(campaign_name, slug)
+        candidates.append(legacy_markdown_path)
+
+    for path in candidates:
+        if path.exists():
+            return path.read_text(encoding="utf-8")
+    raise FileNotFoundError(f"角色卡不存在：{record.get('name', slug)}")
 
 
 def _with_compatibility(payload: dict[str, Any], current_campaign: str | None = None) -> dict[str, Any]:
     data = dict(payload)
-    if current_campaign:
-        data["is_compatible_with_current_campaign"] = data.get("campaign") == current_campaign
-    else:
-        data["is_compatible_with_current_campaign"] = False
+    current_system = _resolve_current_system(current_campaign)
+    data["is_compatible_with_current_campaign"] = bool(current_system and data.get("system") == current_system)
+    data.setdefault("origin_campaign", data.get("campaign", ""))
     return data
 
 
-def list_campaign_characters(campaign_name: str) -> list[dict[str, Any]]:
-    directory = campaign_characters_dir(campaign_name)
-    if not directory.exists():
-        return []
-
+def _iter_all_character_payloads() -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
-    for json_path in sorted(directory.glob("*.json")):
-        payload = _read_json_file(json_path)
-        if not payload:
+    seen_keys: set[str] = set()
+
+    if shared_characters_root_dir().exists():
+        for system_dir in sorted(shared_characters_root_dir().iterdir()):
+            if not system_dir.is_dir():
+                continue
+            for json_path in sorted(system_dir.glob("*.json")):
+                payload = _read_json_file(json_path)
+                if not payload:
+                    continue
+                key = str(payload.get("id") or f"{payload.get('system')}:{payload.get('slug')}:{payload.get('campaign')}")
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                records.append(payload)
+
+    if CAMPAIGNS_DIR.exists():
+        for campaign_dir in sorted(CAMPAIGNS_DIR.iterdir()):
+            if not campaign_dir.is_dir():
+                continue
+            character_dir = campaign_dir / "characters"
+            if not character_dir.exists():
+                continue
+            for json_path in sorted(character_dir.glob("*.json")):
+                payload = _read_json_file(json_path)
+                if not payload:
+                    continue
+                key = str(payload.get("id") or f"{payload.get('system')}:{payload.get('slug')}:{payload.get('campaign')}")
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                records.append(payload)
+
+    return records
+
+
+def list_system_characters(system_name: str, current_campaign: str | None = None) -> list[dict[str, Any]]:
+    if not system_name:
+        return []
+    records = []
+    for payload in _iter_all_character_payloads():
+        if payload.get("system") != system_name:
             continue
-        records.append(_with_compatibility(payload, campaign_name))
+        records.append(_with_compatibility(payload, current_campaign or system_name))
     return sorted(records, key=lambda item: (item.get("updated_at", ""), item.get("name", "")), reverse=True)
 
 
-def list_all_characters(current_campaign: str | None = None) -> list[dict[str, Any]]:
-    if not CAMPAIGNS_DIR.exists():
+def list_campaign_characters(campaign_name: str) -> list[dict[str, Any]]:
+    system_name = _resolve_current_system(campaign_name)
+    if not system_name:
         return []
+    return list_system_characters(system_name, campaign_name)
 
-    records: list[dict[str, Any]] = []
-    for campaign_dir in sorted(CAMPAIGNS_DIR.iterdir()):
-        if not campaign_dir.is_dir():
-            continue
-        character_dir = campaign_dir / "characters"
-        if not character_dir.exists():
-            continue
-        for json_path in sorted(character_dir.glob("*.json")):
-            payload = _read_json_file(json_path)
-            if not payload:
-                continue
-            records.append(_with_compatibility(payload, current_campaign))
+
+def list_all_characters(current_campaign: str | None = None) -> list[dict[str, Any]]:
+    records = [_with_compatibility(payload, current_campaign) for payload in _iter_all_character_payloads()]
     return sorted(records, key=lambda item: (item.get("updated_at", ""), item.get("name", "")), reverse=True)
 
 
@@ -498,6 +603,7 @@ def build_dnd_character_record(campaign_name: str, data: dict[str, Any]) -> dict
         "proficiencies": proficiencies,
         "saving_throws": saving_throws,
         "skills": skill_rows,
+        "proficiency_bonus": proficiency_bonus,
         "hit_die": hit_die,
         "hp": hp,
         "armor_class": 10 + dnd5e_character.mod(scores["DEX"]),
