@@ -1,5 +1,5 @@
 import sys
-from campaign import CAMPAIGNS_DIR
+from campaign import save_campaign_state
 
 def handle_help():
     print("\n=== Available Commands ===")
@@ -15,13 +15,7 @@ def handle_help():
 
 def handle_save(engine):
     print("Saving game state...")
-    # In a real implementation, we would summarize the chat history
-    # and update the state.md file. For now, we'll just write a basic message.
-    state_file = engine.campaign_path / "state.md"
-    if state_file.exists():
-        content = state_file.read_text(encoding="utf-8")
-        # Append a simple save note
-        state_file.write_text(content + "\n- State saved by user command.\n", encoding="utf-8")
+    save_campaign_state(engine.campaign_name)
     print("Game state saved.")
 
 def handle_world(engine):

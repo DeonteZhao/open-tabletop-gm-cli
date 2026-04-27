@@ -25,6 +25,7 @@ campaigns/
 # Local-only helper files
 no_think.md
 paths.md
+.trae/
 
 # Config and User Data
 .config/

@@ -4,6 +4,7 @@ import fitz  # PyMuPDF
 from openai import OpenAI
 from config import get_config
 from campaign import CAMPAIGNS_DIR
+from llm import create_llm_client
 
 def chunk_text(text: str, max_chars: int = 8000) -> list:
     """Split text into chunks of maximum characters."""
@@ -74,7 +75,7 @@ def extract_information(chunk: str, client: OpenAI, model: str) -> dict:
         print(f"Error extracting information: {e}")
         return {"world": "", "npcs": "", "state": ""}
 
-def import_pdf(campaign_name: str, pdf_path: str):
+def import_pdf(campaign_name: str, pdf_path: str, prefer_env_config: bool = True):
     campaign_dir = CAMPAIGNS_DIR / campaign_name
     
     if not os.path.exists(pdf_path):
@@ -135,19 +136,8 @@ def import_pdf(campaign_name: str, pdf_path: str):
     chunks = chunk_text(full_text)
     print(f"Created {len(chunks)} chunks. Processing with AI...")
 
-    config = get_config()
-    client_kwargs = {"api_key": config.api_key}
-    
-    # OpenRouter headers logic matching engine.py
-    if config.base_url and "openrouter.ai" in config.base_url:
-        client_kwargs["default_headers"] = {
-            "HTTP-Referer": "https://github.com/open-tabletop-gm",
-            "X-Title": "Open Tabletop GM"
-        }
-    if config.base_url:
-        client_kwargs["base_url"] = config.base_url
-        
-    client = OpenAI(**client_kwargs)
+    config = get_config(prefer_env=prefer_env_config)
+    client = create_llm_client(config)
 
     combined_world = ""
     combined_npcs = ""

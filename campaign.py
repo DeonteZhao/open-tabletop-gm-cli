@@ -36,6 +36,43 @@ def create_campaign(name: str, system: str = "dnd5e"):
         print(f"Failed to create campaign '{name}': {e}")
         return False
 
+def save_campaign_state(campaign_name: str) -> Path:
+    campaign_name = campaign_name.strip()
+    if not campaign_name:
+        raise ValueError("Campaign name cannot be empty.")
+
+    campaign_path = CAMPAIGNS_DIR / campaign_name
+    if not campaign_path.exists():
+        raise FileNotFoundError(f"Campaign '{campaign_name}' does not exist.")
+
+    state_file = campaign_path / "state.md"
+    if state_file.exists():
+        content = state_file.read_text(encoding="utf-8")
+    else:
+        content = ""
+
+    save_note = "- State saved by user command.\n"
+    if content and not content.endswith("\n"):
+        content += "\n"
+
+    state_file.write_text(content + save_note, encoding="utf-8")
+    return state_file
+
+def delete_campaign(name: str) -> bool:
+    campaign_name = name.strip()
+    if not campaign_name:
+        raise ValueError("Campaign name cannot be empty.")
+
+    campaign_path = CAMPAIGNS_DIR / campaign_name
+    if not campaign_path.exists():
+        return False
+
+    if not campaign_path.is_dir():
+        raise ValueError(f"Campaign path '{campaign_path}' is not a directory.")
+
+    shutil.rmtree(campaign_path)
+    return True
+
 def list_campaigns(print_out: bool = True):
     if not CAMPAIGNS_DIR.exists():
         if print_out:

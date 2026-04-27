@@ -6,6 +6,12 @@
 
   const spriteUrl = document.body.dataset.spriteUrl || "";
   const state = JSON.parse(stateNode.textContent || "{}");
+  const uiState = {
+    apiKeyModified: false,
+    loadingCampaignName: "",
+    importingModule: false,
+  };
+  const CAMPAIGN_NAME_DISPLAY_LIMIT = 14;
 
   const elements = {
     navLinks: Array.from(document.querySelectorAll("[data-view-target]")),
@@ -19,16 +25,26 @@
     importCampaignName: document.getElementById("import-campaign-name"),
     importCampaignSystem: document.getElementById("import-campaign-system"),
     importSource: document.getElementById("import-source"),
+    importSourceTrigger: document.getElementById("import-source-trigger"),
+    importSubmit: document.getElementById("import-submit"),
+    importFeedback: document.getElementById("import-feedback"),
     chatForm: document.getElementById("chat-form"),
     chatInput: document.getElementById("chat-input"),
     chatSubmit: document.getElementById("chat-submit"),
     chatLog: document.getElementById("chat-log"),
     chatCampaign: document.getElementById("chat-campaign"),
     chatSystem: document.getElementById("chat-system"),
+    saveCampaignButton: document.getElementById("save-campaign-button"),
+    deleteCurrentCampaignButton: document.getElementById("delete-current-campaign-button"),
     configForm: document.getElementById("config-form"),
+    provider: document.getElementById("config-provider"),
     apiKey: document.getElementById("config-api-key"),
-    baseUrl: document.getElementById("config-base-url"),
+    apiKeyToggle: document.getElementById("config-api-key-toggle"),
+    apiKeyHint: document.getElementById("config-api-key-hint"),
     model: document.getElementById("config-model"),
+    providerHint: document.getElementById("config-provider-hint"),
+    configSaveFeedback: document.getElementById("config-save-feedback"),
+    configSubmit: document.getElementById("config-submit"),
     statusCampaign: document.getElementById("status-campaign"),
     statusSystem: document.getElementById("status-system"),
     statusReady: document.getElementById("status-ready"),
@@ -43,10 +59,6 @@
     moduleInsightLabel: document.getElementById("module-insight-label"),
     moduleInsightValue: document.getElementById("module-insight-value"),
     specializedSystemBlock: document.getElementById("specialized-system-block"),
-    featureModules: document.getElementById("feature-modules"),
-    quickActions: document.getElementById("quick-actions"),
-    statusTags: document.getElementById("status-tags"),
-    ruleEntries: document.getElementById("rule-entries"),
   };
 
   function escapeHtml(value) {
@@ -56,6 +68,139 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+
+  function escapeAttribute(value) {
+    return escapeHtml(value).replace(/`/g, "&#96;");
+  }
+
+  function renderInlineMarkdown(text) {
+    const inlineCodeTokens = [];
+    let html = escapeHtml(text);
+
+    html = html.replace(/`([^`\n]+)`/g, (_, code) => {
+      const token = `@@INLINE_CODE_${inlineCodeTokens.length}@@`;
+      inlineCodeTokens.push(`<code>${code}</code>`);
+      return token;
+    });
+
+    html = html.replace(
+      /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/gi,
+      (_, label, url) =>
+        `<a href="${escapeAttribute(url)}" target="_blank" rel="noreferrer noopener">${label}</a>`,
+    );
+    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
+
+    return html.replace(/@@INLINE_CODE_(\d+)@@/g, (_, index) => inlineCodeTokens[Number(index)] || "");
+  }
+
+  function renderMarkdown(source) {
+    const normalized = String(source || "").replace(/\r\n/g, "\n").trim();
+    if (!normalized) {
+      return "";
+    }
+
+    const codeBlockTokens = [];
+    const tokenized = normalized.replace(/```([a-z0-9_-]+)?\n([\s\S]*?)```/gi, (_, language = "", code) => {
+      const token = `@@CODE_BLOCK_${codeBlockTokens.length}@@`;
+      const languageClass = language ? ` class="language-${escapeAttribute(language)}"` : "";
+      const safeCode = escapeHtml(code.replace(/\n$/, ""));
+      codeBlockTokens.push(`<pre class="md-code-block"><code${languageClass}>${safeCode}</code></pre>`);
+      return token;
+    });
+
+    const lines = tokenized.split("\n");
+    const blocks = [];
+
+    function isSpecialLine(line) {
+      return (
+        /^@@CODE_BLOCK_\d+@@$/.test(line) ||
+        /^#{1,3}\s+/.test(line) ||
+        /^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line) ||
+        /^>\s?/.test(line) ||
+        /^[-*]\s+/.test(line) ||
+        /^\d+\.\s+/.test(line)
+      );
+    }
+
+    for (let index = 0; index < lines.length; ) {
+      const line = lines[index];
+
+      if (!line.trim()) {
+        index += 1;
+        continue;
+      }
+
+      if (/^@@CODE_BLOCK_\d+@@$/.test(line)) {
+        blocks.push(line);
+        index += 1;
+        continue;
+      }
+
+      if (/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line)) {
+        blocks.push("<hr>");
+        index += 1;
+        continue;
+      }
+
+      const headingMatch = line.match(/^(#{1,3})\s+(.*)$/);
+      if (headingMatch) {
+        const level = headingMatch[1].length;
+        blocks.push(`<h${level}>${renderInlineMarkdown(headingMatch[2].trim())}</h${level}>`);
+        index += 1;
+        continue;
+      }
+
+      if (/^>\s?/.test(line)) {
+        const quoteLines = [];
+        while (index < lines.length && /^>\s?/.test(lines[index])) {
+          quoteLines.push(lines[index].replace(/^>\s?/, ""));
+          index += 1;
+        }
+        blocks.push(`<blockquote>${renderInlineMarkdown(quoteLines.join("\n")).replace(/\n/g, "<br>")}</blockquote>`);
+        continue;
+      }
+
+      if (/^[-*]\s+/.test(line)) {
+        const items = [];
+        while (index < lines.length && /^[-*]\s+/.test(lines[index])) {
+          items.push(`<li>${renderInlineMarkdown(lines[index].replace(/^[-*]\s+/, "").trim())}</li>`);
+          index += 1;
+        }
+        blocks.push(`<ul>${items.join("")}</ul>`);
+        continue;
+      }
+
+      if (/^\d+\.\s+/.test(line)) {
+        const items = [];
+        while (index < lines.length && /^\d+\.\s+/.test(lines[index])) {
+          items.push(`<li>${renderInlineMarkdown(lines[index].replace(/^\d+\.\s+/, "").trim())}</li>`);
+          index += 1;
+        }
+        blocks.push(`<ol>${items.join("")}</ol>`);
+        continue;
+      }
+
+      const paragraphLines = [];
+      while (index < lines.length && lines[index].trim() && !isSpecialLine(lines[index])) {
+        paragraphLines.push(lines[index]);
+        index += 1;
+      }
+      blocks.push(`<p>${renderInlineMarkdown(paragraphLines.join("\n")).replace(/\n/g, "<br>")}</p>`);
+    }
+
+    return blocks
+      .join("")
+      .replace(/@@CODE_BLOCK_(\d+)@@/g, (_, tokenIndex) => codeBlockTokens[Number(tokenIndex)] || "");
+  }
+
+  function truncateCampaignName(value) {
+    const text = String(value || "").trim();
+    if (text.length <= CAMPAIGN_NAME_DISPLAY_LIMIT) {
+      return text;
+    }
+    return `${text.slice(0, CAMPAIGN_NAME_DISPLAY_LIMIT)}...`;
   }
 
   function renderIcon(name, className = "icon") {
@@ -92,7 +237,7 @@
 
   function currentSystemMeta() {
     const fallback = {
-      label: "D&D 5E",
+      label: "DND",
       tagline: "英雄史诗",
       theme: "dnd5e",
       module_icon: "shield",
@@ -100,12 +245,8 @@
       resource_value: "32 / 16 / +3",
       resource_ratio: 0.72,
       resource_meter: "heroic",
-      insight_label: "战斗面板",
-      insight_value: "资源、条件、行动入口",
-      status_tags: [],
-      quick_actions: [],
-      rule_entries: [],
-      feature_modules: [],
+      insight_label: "会话摘要",
+      insight_value: "集中维持中 / 法术位 3 / 4 / 死亡豁免 0 / 3",
       specialized_panel: null,
     };
     return state.system_meta || fallback;
@@ -124,6 +265,72 @@
     renderStatus();
   }
 
+  function setConfigFeedback(message, tone = "neutral") {
+    if (!elements.configSaveFeedback) {
+      return;
+    }
+    elements.configSaveFeedback.textContent = message;
+    elements.configSaveFeedback.dataset.tone = tone;
+  }
+
+  function setImportFeedback(message, tone = "neutral") {
+    if (!elements.importFeedback) {
+      return;
+    }
+    elements.importFeedback.textContent = message;
+    elements.importFeedback.dataset.tone = tone;
+  }
+
+  function setButtonBusy(button, busy, busyLabel) {
+    if (!button) {
+      return;
+    }
+    const labelNode = button.querySelector("span");
+    if (!button.dataset.idleLabel && labelNode) {
+      button.dataset.idleLabel = labelNode.textContent || "";
+    }
+    button.disabled = busy;
+    button.classList.toggle("is-loading", busy);
+    button.setAttribute("aria-busy", busy ? "true" : "false");
+    if (labelNode) {
+      labelNode.textContent = busy ? busyLabel : (button.dataset.idleLabel || labelNode.textContent);
+    }
+  }
+
+  function syncImportSourceButton() {
+    if (!elements.importSourceTrigger) {
+      return;
+    }
+    const source = elements.importSource.files && elements.importSource.files[0];
+    const labelNode = elements.importSourceTrigger.querySelector("span");
+    if (!elements.importSourceTrigger.dataset.idleLabel && labelNode) {
+      elements.importSourceTrigger.dataset.idleLabel = labelNode.textContent || "导入模组";
+    }
+    if (labelNode) {
+      labelNode.textContent = source ? source.name : (elements.importSourceTrigger.dataset.idleLabel || "导入模组");
+    }
+    elements.importSourceTrigger.classList.toggle("is-selected", Boolean(source));
+  }
+
+  function renderApiKeyHint() {
+    if (!elements.apiKeyHint) {
+      return;
+    }
+
+    const config = state.config || {};
+    if (uiState.apiKeyModified) {
+      elements.apiKeyHint.textContent = "检测到 API Key 已修改，保存时会写入新值。";
+      return;
+    }
+
+    if (config.api_key_configured) {
+      elements.apiKeyHint.textContent = "已检测到现有 API Key；前端不会回填明文，留空提交会保留原 Key。";
+      return;
+    }
+
+    elements.apiKeyHint.textContent = "尚未保存 API Key；输入后仅在保存时提交。";
+  }
+
   function renderCampaigns() {
     const campaigns = Array.isArray(state.campaigns) ? state.campaigns : [];
     elements.campaignCount.textContent = `${campaigns.length} 个项目`;
@@ -134,7 +341,7 @@
         '<p class="eyebrow">空状态</p>',
         renderIcon("book-open", "icon icon-empty"),
         "<h3>暂无战役</h3>",
-        "<p class=\"card-copy\">先创建一个 D&D 5E 或 CoC 7E 战役，布局会自动切换到对应系统语义。</p>",
+        "<p class=\"card-copy\">先创建一个 DND 或 COC 战役，布局会自动切换到对应系统语义。</p>",
         "</article>",
       ].join("");
       return;
@@ -148,7 +355,7 @@
           '<div class="card-header">',
           "<div>",
           '<p class="eyebrow">战役</p>',
-          `<h3>${escapeHtml(campaign.name)}</h3>`,
+          `<h3 class="campaign-card-title" title="${escapeHtml(campaign.name)}">${escapeHtml(campaign.display_name || truncateCampaignName(campaign.name))}</h3>`,
           "</div>",
           `<span class="chip">${renderIcon(icon, "icon icon-xs")}<span>${escapeHtml(campaign.system_label)}</span></span>`,
           "</div>",
@@ -158,7 +365,8 @@
             "<span class=\"segment\"></span>".repeat(4),
           "</div>",
           '<div class="card-actions">',
-          `<button class="button secondary" type="button" data-action="load-campaign" data-campaign="${escapeHtml(campaign.name)}">${renderIcon("door")}<span>进入游戏室</span></button>`,
+          `<button class="button secondary card-action-main" type="button" data-action="load-campaign" data-campaign="${escapeHtml(campaign.name)}">${renderIcon("door")}<span>进入游戏室</span></button>`,
+          `<button class="button ghost danger icon-only" type="button" data-action="delete-campaign" data-campaign="${escapeHtml(campaign.name)}" aria-label="删除战役" title="删除战役">${renderIcon("trash")}<span class="sr-only">删除</span></button>`,
           "</div>",
           "</article>",
         ].join("");
@@ -168,15 +376,37 @@
 
   function renderChat() {
     const history = Array.isArray(state.chat_history) ? state.chat_history : [];
-    elements.chatSubmit.disabled = !state.chat_ready;
-    elements.chatInput.disabled = !state.chat_ready;
+    const isLoadingCampaign = Boolean(uiState.loadingCampaignName);
+    elements.chatSubmit.disabled = !state.chat_ready || isLoadingCampaign;
+    elements.chatInput.disabled = !state.chat_ready || isLoadingCampaign;
+    if (elements.saveCampaignButton) {
+      elements.saveCampaignButton.disabled = !state.current_campaign;
+    }
+    if (elements.deleteCurrentCampaignButton) {
+      elements.deleteCurrentCampaignButton.disabled = !state.current_campaign;
+    }
 
-    if (state.current_campaign) {
+    if (isLoadingCampaign) {
+      elements.chatCampaign.textContent = uiState.loadingCampaignName;
+      elements.chatSystem.textContent = "INITIALIZING";
+    } else if (state.current_campaign) {
       elements.chatCampaign.textContent = state.current_campaign.name;
       elements.chatSystem.textContent = state.current_campaign.system_label;
     } else {
       elements.chatCampaign.textContent = "等待载入战役";
       elements.chatSystem.textContent = "SYSTEM OFFLINE";
+    }
+
+    if (isLoadingCampaign) {
+      elements.chatLog.innerHTML = [
+        '<article class="empty-card chat-empty is-loading-state">',
+        '<p class="eyebrow">载入中</p>',
+        renderIcon("spark", "icon icon-empty"),
+        `<h3>正在进入 ${escapeHtml(uiState.loadingCampaignName)}</h3>`,
+        '<p class="card-copy">正在初始化 AI GM、读取战役文件并生成开场内容，请稍候。</p>',
+        "</article>",
+      ].join("");
+      return;
     }
 
     if (!history.length) {
@@ -194,7 +424,7 @@
     elements.chatLog.innerHTML = history
       .map((message) => {
         const roleLabel = message.role === "user" ? "玩家输入" : "AI GM";
-        const content = escapeHtml(message.content).replace(/\n/g, "<br>");
+        const content = renderMarkdown(message.content);
         return [
           `<article class="chat-message ${escapeHtml(message.role)}">`,
           `<p class="eyebrow">${renderIcon(messageIcon(message.role), "icon icon-xs")}<span>${roleLabel}</span></p>`,
@@ -219,19 +449,21 @@
       !elements.moduleResourceMeter ||
       !elements.moduleInsightLabel ||
       !elements.moduleInsightValue ||
-      !elements.specializedSystemBlock ||
-      !elements.featureModules ||
-      !elements.quickActions ||
-      !elements.statusTags ||
-      !elements.ruleEntries
+      !elements.specializedSystemBlock
     ) {
       return;
     }
 
     elements.statusCampaign.textContent = state.current_campaign ? state.current_campaign.name : "未载入";
     elements.statusSystem.textContent = state.current_campaign ? state.current_campaign.system_label : "待选择";
-    elements.statusReady.textContent = state.chat_ready ? "在线" : "待命";
-    elements.statusMessage.textContent = state.status_message || "等待操作。";
+    if (uiState.loadingCampaignName) {
+      elements.statusCampaign.textContent = uiState.loadingCampaignName;
+      elements.statusReady.textContent = "加载中";
+      elements.statusMessage.textContent = `正在载入战役：${uiState.loadingCampaignName}`;
+    } else {
+      elements.statusReady.textContent = state.chat_ready ? "在线" : "待命";
+      elements.statusMessage.textContent = state.status_message || "等待操作。";
+    }
 
     elements.modulePanel.className = `panel system-panel system-panel-${systemMeta.theme || "dnd5e"}`;
     elements.moduleIcon.innerHTML = `<use href="${spriteUrl}#icon-${systemMeta.module_icon || "shield"}"></use>`;
@@ -244,61 +476,6 @@
     elements.moduleResourceMeter.className = `resource-meter ${systemMeta.resource_meter || "heroic"}`;
     elements.moduleResourceMeter.innerHTML = buildMeter(systemMeta.resource_ratio, state.current_campaign && state.current_campaign.system);
     elements.specializedSystemBlock.innerHTML = renderSpecializedPanel(systemMeta);
-
-    elements.featureModules.innerHTML = (systemMeta.feature_modules || [])
-      .map((module) => {
-        const stats = (module.stats || [])
-          .map((stat) => {
-            return [
-              `<div class="feature-stat tone-${escapeHtml(stat.tone || "neutral")}">`,
-              `<span class="feature-stat-label">${renderIcon(stat.icon || "shield", "icon icon-xs")}<span>${escapeHtml(stat.label)}</span></span>`,
-              `<strong>${escapeHtml(stat.value)}</strong>`,
-              "</div>",
-            ].join("");
-          })
-          .join("");
-
-        return [
-          '<article class="feature-module-card">',
-          '<div class="feature-module-head">',
-          "<div>",
-          `<p class="eyebrow">${escapeHtml(module.eyebrow || "专属模块")}</p>`,
-          `<h4>${escapeHtml(module.title)}</h4>`,
-          "</div>",
-          renderIcon(module.icon || "shield"),
-          "</div>",
-          `<p class="card-copy">${escapeHtml(module.description)}</p>`,
-          `<div class="feature-stat-list">${stats}</div>`,
-          "</article>",
-        ].join("");
-      })
-      .join("");
-
-    elements.quickActions.innerHTML = (systemMeta.quick_actions || [])
-      .map((action) => {
-        return `<button class="button ${escapeHtml(action.variant || "secondary")}" type="button">${renderIcon(action.icon || "spark")}<span>${escapeHtml(action.label)}</span></button>`;
-      })
-      .join("");
-
-    elements.statusTags.innerHTML = (systemMeta.status_tags || [])
-      .map((tag) => {
-        return `<span class="chip chip-tone-${escapeHtml(tag.tone || "neutral")}">${renderIcon(tag.icon || "spark", "icon icon-xs")}<span>${escapeHtml(tag.label)}</span></span>`;
-      })
-      .join("");
-
-    elements.ruleEntries.innerHTML = (systemMeta.rule_entries || [])
-      .map((rule) => {
-        return [
-          '<article class="rule-entry">',
-          '<div class="rule-entry-head">',
-          renderIcon(rule.icon || "book-open"),
-          `<strong>${escapeHtml(rule.title)}</strong>`,
-          "</div>",
-          `<p>${escapeHtml(rule.detail)}</p>`,
-          "</article>",
-        ].join("");
-      })
-      .join("");
   }
 
   function buildSegments(total, filled, toneClass = "") {
@@ -342,17 +519,6 @@
       })
       .join("");
 
-    const actions = (panel.action_steps || [])
-      .map((action) => {
-        return [
-          '<div class="action-lane-row">',
-          `<span class="feature-stat-label">${renderIcon(action.icon || "spark", "icon icon-xs")}<span>${escapeHtml(action.label)}</span></span>`,
-          `<strong>${escapeHtml(action.detail)}</strong>`,
-          "</div>",
-        ].join("");
-      })
-      .join("");
-
     return [
       '<section class="specialized-panel specialized-panel-dnd">',
       '<div class="specialized-panel-head">',
@@ -362,14 +528,9 @@
       "</div>",
       renderIcon("swords"),
       "</div>",
-      `<p class="card-copy">${escapeHtml(panel.summary || "")}</p>`,
       `<div class="battle-stat-grid">${stats}</div>`,
       '<div class="resource-track-stack">',
       tracks,
-      "</div>",
-      '<div class="action-lane">',
-      '<p class="eyebrow">行动经济</p>',
-      actions,
       "</div>",
       "</section>",
     ].join("");
@@ -394,12 +555,6 @@
     }
 
     const check = panel.d100_check || {};
-    const clues = (panel.clue_chain || [])
-      .map((clue) => {
-        return `<span class="chip chip-tone-${escapeHtml(clue.tone || "neutral")}">${renderIcon(clue.icon || "fingerprint", "icon icon-xs")}<span>${escapeHtml(clue.label)}</span></span>`;
-      })
-      .join("");
-
     return [
       '<section class="specialized-panel specialized-panel-coc">',
       '<div class="specialized-panel-head">',
@@ -409,7 +564,6 @@
       "</div>",
       renderIcon("brain"),
       "</div>",
-      `<p class="card-copy">${escapeHtml(panel.summary || "")}</p>`,
       '<div class="sanity-fuse-card">',
       '<div class="meter-meta">',
       `<span>${renderIcon("brain", "icon icon-xs")}${escapeHtml(sanity.label || "Sanity Fuse")}</span>`,
@@ -430,10 +584,6 @@
       "</div>",
       `<p class="d100-footnote">Target ≤ ${escapeHtml(String(check.target ?? ""))} / Hard ≤ ${escapeHtml(String(check.hard ?? ""))} / Extreme ≤ ${escapeHtml(String(check.extreme ?? ""))}</p>`,
       "</div>",
-      '<div class="clue-chain">',
-      '<p class="eyebrow">调查链路</p>',
-      `<div class="chip-grid">${clues}</div>`,
-      "</div>",
       "</section>",
     ].join("");
   }
@@ -451,9 +601,39 @@
 
   function renderConfig() {
     const config = state.config || {};
-    elements.apiKey.value = config.api_key || "";
-    elements.baseUrl.value = config.base_url || "";
+    elements.provider.value = config.provider || "openai";
     elements.model.value = config.model || "";
+    elements.apiKey.placeholder = config.api_key_configured ? "已存在，留空则保持不变" : "sk-...";
+    if (elements.apiKeyToggle) {
+      const isVisible = elements.apiKey.type === "text";
+      elements.apiKeyToggle.setAttribute("aria-pressed", isVisible ? "true" : "false");
+      elements.apiKeyToggle.querySelector("span").textContent = isVisible ? "隐藏" : "显示";
+    }
+    renderApiKeyHint();
+    renderProviderHint();
+  }
+
+  function renderImport() {
+    syncImportSourceButton();
+    setButtonBusy(elements.importSubmit, uiState.importingModule, "正在导入...");
+    if (elements.importSourceTrigger) {
+      elements.importSourceTrigger.disabled = uiState.importingModule;
+    }
+  }
+
+  function renderProviderHint() {
+    const selectedOption = elements.provider.options[elements.provider.selectedIndex];
+    if (!selectedOption) {
+      return;
+    }
+
+    const baseUrl = selectedOption.dataset.baseUrl || "";
+    const modelPlaceholder = selectedOption.dataset.modelPlaceholder || "gpt-4o";
+    elements.model.placeholder = modelPlaceholder;
+
+    if (elements.providerHint) {
+      elements.providerHint.textContent = `当前提供商地址：${baseUrl}`;
+    }
   }
 
   function renderAll() {
@@ -461,22 +641,34 @@
     renderChat();
     renderStatus();
     renderConfig();
+    renderImport();
   }
 
-  async function postJson(url, payload) {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+  async function requestJson(url, method, payload) {
+    const options = {
+      method,
+      headers: {},
+    };
+    if (payload !== undefined) {
+      options.headers["Content-Type"] = "application/json";
+      options.body = JSON.stringify(payload);
+    }
+
+    const response = await fetch(url, options);
 
     const data = await response.json();
     if (!response.ok || !data.ok) {
       throw new Error(data.message || "请求失败");
     }
     return data;
+  }
+
+  async function postJson(url, payload) {
+    return requestJson(url, "POST", payload);
+  }
+
+  async function deleteJson(url) {
+    return requestJson(url, "DELETE");
   }
 
   async function postForm(url, formData) {
@@ -507,22 +699,99 @@
   });
 
   elements.campaignGrid.addEventListener("click", async (event) => {
-    const button = event.target.closest("[data-action='load-campaign']");
+    const button = event.target.closest("[data-action]");
     if (!button) {
       return;
     }
 
-    button.disabled = true;
+    if (button.dataset.action === "delete-campaign") {
+      const campaignName = button.dataset.campaign || "";
+      const confirmed = window.confirm(`确定要删除战役“${campaignName}”吗？此操作不可撤销。`);
+      if (!confirmed) {
+        return;
+      }
+
+      button.disabled = true;
+      try {
+        const data = await deleteJson(`/api/campaigns/${encodeURIComponent(campaignName)}`);
+        mergeState(data.state);
+        if (!state.current_campaign) {
+          activateView("campaigns");
+        }
+      } catch (error) {
+        pushInlineStatus(error.message);
+      } finally {
+        button.disabled = false;
+      }
+      return;
+    }
+
+    if (button.dataset.action !== "load-campaign") {
+      return;
+    }
+
+    uiState.loadingCampaignName = button.dataset.campaign || "";
+    setButtonBusy(button, true, "载入中...");
+    pushInlineStatus(`正在载入战役：${uiState.loadingCampaignName}`);
+    activateView("chat");
+    renderAll();
     try {
-      const data = await postJson("/api/campaigns/load", { name: button.dataset.campaign });
+      const [data] = await Promise.all([
+        postJson("/api/campaigns/load", { name: button.dataset.campaign }),
+        new Promise((resolve) => window.setTimeout(resolve, 600)),
+      ]);
+      uiState.loadingCampaignName = "";
       mergeState(data.state);
       activateView("chat");
     } catch (error) {
+      uiState.loadingCampaignName = "";
+      activateView("campaigns");
       pushInlineStatus(error.message);
     } finally {
-      button.disabled = false;
+      setButtonBusy(button, false, "载入中...");
+      renderAll();
     }
   });
+
+  if (elements.saveCampaignButton) {
+    elements.saveCampaignButton.addEventListener("click", async () => {
+      elements.saveCampaignButton.disabled = true;
+      try {
+        const data = await postJson("/api/campaigns/save", {});
+        mergeState(data.state);
+      } catch (error) {
+        pushInlineStatus(error.message);
+      } finally {
+        elements.saveCampaignButton.disabled = !state.current_campaign;
+      }
+    });
+  }
+
+  if (elements.deleteCurrentCampaignButton) {
+    elements.deleteCurrentCampaignButton.addEventListener("click", async () => {
+      const currentCampaign = state.current_campaign && state.current_campaign.name;
+      if (!currentCampaign) {
+        pushInlineStatus("当前没有可删除的战役。");
+        return;
+      }
+
+      const confirmed = window.confirm(`确定要删除当前战役“${currentCampaign}”吗？此操作不可撤销。`);
+      if (!confirmed) {
+        return;
+      }
+
+      elements.deleteCurrentCampaignButton.disabled = true;
+      try {
+        const data = await deleteJson(`/api/campaigns/${encodeURIComponent(currentCampaign)}`);
+        mergeState(data.state);
+        activateView("campaigns");
+      } catch (error) {
+        pushInlineStatus(error.message);
+      } finally {
+        elements.deleteCurrentCampaignButton.disabled = !state.current_campaign;
+      }
+    });
+  }
 
   elements.campaignForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -544,11 +813,15 @@
     event.preventDefault();
     const source = elements.importSource.files && elements.importSource.files[0];
     if (!source) {
+      setImportFeedback("请先选择要导入的模组文件。", "danger");
       pushInlineStatus("请先选择要导入的模组文件。");
       return;
     }
 
     try {
+      uiState.importingModule = true;
+      renderImport();
+      setImportFeedback(`正在导入 ${source.name}...`, "neutral");
       pushInlineStatus("正在导入模组...");
       const formData = new FormData();
       formData.append("name", elements.importCampaignName.value.trim());
@@ -556,29 +829,80 @@
       formData.append("source", source);
       const data = await postForm("/api/import-module", formData);
       mergeState(data.state);
-      renderAll();
       elements.importForm.reset();
+      syncImportSourceButton();
+      setImportFeedback(data.message || "导入成功。", "success");
       pushInlineStatus(data.message);
     } catch (error) {
+      setImportFeedback(error.message, "danger");
       pushInlineStatus(error.message);
+    } finally {
+      uiState.importingModule = false;
+      renderAll();
     }
   });
 
   elements.configForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const payload = {
-      api_key: elements.apiKey.value,
-      base_url: elements.baseUrl.value,
+      provider: elements.provider.value,
+      api_key: uiState.apiKeyModified ? elements.apiKey.value : "",
+      api_key_modified: uiState.apiKeyModified,
       model: elements.model.value,
     };
 
     try {
+      setConfigFeedback("正在保存配置...", "neutral");
+      setButtonBusy(elements.configSubmit, true, "正在保存...");
       const data = await postJson("/api/config", payload);
+      uiState.apiKeyModified = false;
+      elements.apiKey.value = "";
       mergeState(data.state);
+      setConfigFeedback(data.message || "配置保存成功。", "success");
     } catch (error) {
+      setConfigFeedback(error.message, "danger");
       pushInlineStatus(error.message);
+    } finally {
+      setButtonBusy(elements.configSubmit, false, "正在保存...");
     }
   });
+
+  elements.provider.addEventListener("change", () => {
+    renderProviderHint();
+  });
+
+  if (elements.importSourceTrigger) {
+    elements.importSourceTrigger.addEventListener("click", () => {
+      elements.importSource.click();
+    });
+  }
+
+  if (elements.importSource) {
+    elements.importSource.addEventListener("change", () => {
+      syncImportSourceButton();
+      if (elements.importSource.files && elements.importSource.files[0]) {
+        setImportFeedback(`已选择文件：${elements.importSource.files[0].name}`, "neutral");
+      } else {
+        setImportFeedback("等待导入。", "neutral");
+      }
+    });
+  }
+
+  if (elements.apiKey) {
+    elements.apiKey.addEventListener("input", () => {
+      uiState.apiKeyModified = true;
+      renderApiKeyHint();
+    });
+  }
+
+  if (elements.apiKeyToggle) {
+    elements.apiKeyToggle.addEventListener("click", () => {
+      const isVisible = elements.apiKey.type === "text";
+      elements.apiKey.type = isVisible ? "password" : "text";
+      elements.apiKeyToggle.setAttribute("aria-pressed", isVisible ? "false" : "true");
+      elements.apiKeyToggle.querySelector("span").textContent = isVisible ? "显示" : "隐藏";
+    });
+  }
 
   elements.chatForm.addEventListener("submit", async (event) => {
     event.preventDefault();

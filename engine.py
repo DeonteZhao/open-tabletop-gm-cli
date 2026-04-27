@@ -1,36 +1,25 @@
 import os
 import json
 from pathlib import Path
-from openai import OpenAI
 from config import get_config
+from llm import create_llm_client
 from tools import execute_tool, get_project_root
 from campaign import CAMPAIGNS_DIR
 
 class Engine:
-    def __init__(self, campaign_name: str):
+    def __init__(self, campaign_name: str, prefer_env_config: bool = True):
         self.campaign_name = campaign_name
         self.campaign_path = CAMPAIGNS_DIR / campaign_name
-        self.config = get_config()
-        
-        client_kwargs = {
-            "api_key": self.config.api_key,
-        }
-        
-        # OpenRouter needs specific headers to work properly
-        if self.config.base_url and "openrouter.ai" in self.config.base_url:
-            client_kwargs["default_headers"] = {
-                "HTTP-Referer": "https://github.com/open-tabletop-gm",
-                "X-Title": "Open Tabletop GM"
-            }
-        
-        if self.config.base_url:
-            client_kwargs["base_url"] = self.config.base_url
-            
-        self.client = OpenAI(**client_kwargs)
-        self.model = self.config.model
+        self.prefer_env_config = prefer_env_config
+        self.refresh_config()
         
         self.messages = []
         self.system_prompt_initialized = False
+
+    def refresh_config(self):
+        self.config = get_config(prefer_env=self.prefer_env_config)
+        self.client = create_llm_client(self.config)
+        self.model = self.config.model
 
     def build_system_prompt(self) -> str:
         prompt_parts = []

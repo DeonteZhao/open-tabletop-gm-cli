@@ -3,7 +3,7 @@
     <div class="card-header">
       <div>
         <p class="eyebrow">战役</p>
-        <h3>{{ campaign.name }}</h3>
+        <h3 class="campaign-card-title" title="{{ campaign.name }}">{{ campaign.display_name or campaign.name }}</h3>
       </div>
       <span class="chip">
         <svg class="icon icon-xs" aria-hidden="true">
@@ -26,11 +26,17 @@
       <span class="segment"></span>
     </div>
     <div class="card-actions">
-      <button class="button secondary" type="button" data-action="load-campaign" data-campaign="{{ campaign.name }}">
+      <button class="button secondary card-action-main" type="button" data-action="load-campaign" data-campaign="{{ campaign.name }}">
         <svg class="icon" aria-hidden="true">
           <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-door"></use>
         </svg>
         <span>进入游戏室</span>
+      </button>
+      <button class="button ghost danger icon-only" type="button" data-action="delete-campaign" data-campaign="{{ campaign.name }}" aria-label="删除战役" title="删除战役">
+        <svg class="icon" aria-hidden="true">
+          <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-trash"></use>
+        </svg>
+        <span class="sr-only">删除</span>
       </button>
     </div>
   </article>
@@ -41,6 +47,6 @@
       <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-book-open"></use>
     </svg>
     <h3>暂无战役</h3>
-    <p class="card-copy">先创建一个 D&D 5E 或 CoC 7E 战役，布局会自动切换到对应系统语义。</p>
+    <p class="card-copy">先创建一个 DND 或 COC 战役，布局会自动切换到对应系统语义。</p>
   </article>
 {% endfor %}
