@@ -70,14 +70,13 @@ class WebUiCharacterFlowTests(unittest.TestCase):
         self.client.post("/api/campaigns/load", json={"name": "alpha"})
         steps = [
             "Aldric",
-            "Tester",
-            "Human",
-            "fighter",
-            "Soldier",
+            "人类",
+            "战士",
+            "士兵",
             "Lawful Good",
-            "manual",
+            "手动输入",
             "STR=15 DEX=14 CON=13 INT=12 WIS=10 CHA=8",
-            "Athletics, Survival",
+            "运动, 求生",
             "是",
         ]
 

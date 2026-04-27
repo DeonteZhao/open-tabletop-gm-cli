@@ -21,14 +21,21 @@ from campaign import (
 )
 from characters import (
     COC_STATS,
+    DND_ABILITY_METHOD_OPTIONS,
+    DND_BACKGROUND_OPTIONS,
+    DND_CLASS_OPTIONS,
     DND_CLASS_NAMES,
+    DND_RACE_OPTIONS,
     DND_SKILL_NAMES,
     DND_STATS,
     build_coc_character_record,
     build_dnd_character_record,
+    describe_dnd_options,
+    describe_dnd_skills,
     generate_dnd_roll_arrays,
     list_all_characters,
     list_campaign_characters,
+    normalize_dnd_ability_method,
     parse_stat_block,
     resolve_character_choice,
     save_character_record,
@@ -368,7 +375,7 @@ def _character_list_text(campaign_name: str) -> str:
 
 def _start_character_creation(state: SessionState) -> str:
     state.guide_state = "create_character"
-    state.guide_context = {"system": state.campaign_system, "step": "name", "form": {}}
+    state.guide_context = {"system": state.campaign_system, "step": "name", "form": {"player_name": "玩家"}}
     if state.campaign_system == "coc7e":
         return (
             "当前战役还没有可用角色，我们现在开始创建调查员。\n\n"
@@ -410,18 +417,28 @@ def _finalize_character_selection(state: SessionState, character_summary: dict[s
 def _prompt_for_dnd_step(step: str, context: dict[str, Any]) -> str:
     if step == "name":
         return "第 1 步：请输入角色姓名。"
-    if step == "player_name":
-        return "第 2 步：请输入玩家名。"
     if step == "race":
-        return "第 3 步：请输入种族，例如 Human、Elf、Dwarf。"
+        return (
+            "第 2 步：请选择种族。你可以直接输入英文键名，也可以输入中文名。\n\n"
+            f"{describe_dnd_options(DND_RACE_OPTIONS)}"
+        )
     if step == "class":
-        return f"第 4 步：请输入职业。可选：{', '.join(DND_CLASS_NAMES)}。"
+        return (
+            "第 3 步：请选择职业。你可以直接输入英文键名，也可以输入中文名。\n\n"
+            f"{describe_dnd_options(DND_CLASS_OPTIONS)}"
+        )
     if step == "background":
-        return "第 5 步：请输入背景，例如 Soldier、Acolyte、Criminal。"
+        return (
+            "第 4 步：请选择背景。你可以直接输入英文键名，也可以输入中文名。\n\n"
+            f"{describe_dnd_options(DND_BACKGROUND_OPTIONS)}"
+        )
     if step == "alignment":
-        return "第 6 步：请输入阵营；若不关心可输入“未指定”。"
+        return "第 5 步：请输入阵营；若不关心可输入“未指定”。"
     if step == "ability_method":
-        return "第 7 步：请选择属性生成方式，输入 `roll`、`pointbuy` 或 `manual`。"
+        return (
+            "第 6 步：请选择属性生成方式。你可以输入英文键名，也可以直接输入中文。\n\n"
+            f"{describe_dnd_options(DND_ABILITY_METHOD_OPTIONS)}"
+        )
     if step == "scores":
         method = context["form"].get("ability_method", "manual")
         if method == "roll":
@@ -429,23 +446,23 @@ def _prompt_for_dnd_step(step: str, context: dict[str, Any]) -> str:
             context["roll_arrays"] = arrays
             lines = [f"数组 {index}: {array}" for index, array in enumerate(arrays, start=1)]
             return (
-                "第 8 步：请选择一个数组并分配六维。请直接回复一行属性，例如：\n"
+                "第 7 步：请选择一个数组并分配六维。请直接回复一行属性，例如：\n"
                 "`STR=15 DEX=14 CON=13 INT=12 WIS=10 CHA=8`\n\n"
                 + "\n".join(lines)
             )
         if method == "pointbuy":
             return (
-                "第 8 步：请按 27 点购点输入六维，范围 8-15，例如：\n"
+                "第 7 步：请按 27 点购点输入六维，范围 8-15，例如：\n"
                 "`STR=15 DEX=14 CON=13 INT=10 WIS=12 CHA=8`"
             )
         return (
-            "第 8 步：请直接输入六维，格式例如：\n"
+            "第 7 步：请直接输入六维，格式例如：\n"
             "`STR=15 DEX=14 CON=13 INT=12 WIS=10 CHA=8`"
         )
     if step == "proficiencies":
         return (
-            "第 9 步：请输入熟练技能，使用逗号分隔，可留空。\n"
-            f"可选技能：{', '.join(DND_SKILL_NAMES)}"
+            "第 8 步：请输入熟练技能，使用逗号分隔，可输入英文或中文，也可以留空。\n\n"
+            f"{describe_dnd_skills()}"
         )
     if step == "confirm":
         record = context["pending_record"]
@@ -466,23 +483,21 @@ def _prompt_for_dnd_step(step: str, context: dict[str, Any]) -> str:
 def _prompt_for_coc_step(step: str, context: dict[str, Any]) -> str:
     if step == "name":
         return "第 1 步：请输入调查员姓名。"
-    if step == "player_name":
-        return "第 2 步：请输入玩家名。"
     if step == "era":
-        return "第 3 步：请输入时代或背景，例如 1920s、现代、维多利亚时代。"
+        return "第 2 步：请输入时代或背景，例如 1920年代、现代、维多利亚时代。"
     if step == "occupation":
-        return "第 4 步：请输入职业，例如 私家侦探、记者、医生。"
+        return "第 3 步：请输入职业，例如 私家侦探、记者、医生、教授。"
     if step == "age":
-        return "第 5 步：请输入年龄。"
+        return "第 4 步：请输入年龄。"
     if step == "scores":
         return (
-            "第 6 步：请一次性输入八项属性，格式例如：\n"
+            "第 5 步：请一次性输入八项属性，格式例如：\n"
             "`STR=60 CON=55 SIZ=65 DEX=70 APP=50 INT=75 POW=60 EDU=70`"
         )
     if step == "skills_summary":
-        return "第 7 步：请输入关键技能或专长摘要，使用逗号分隔，例如“图书馆使用 70，侦查 60，聆听 55”。"
+        return "第 6 步：请输入关键技能或专长摘要，使用逗号分隔，例如“图书馆使用 70，侦查 60，聆听 55”。"
     if step == "backstory":
-        return "第 8 步：请输入一段简短背景。"
+        return "第 7 步：请输入一段简短背景。"
     if step == "confirm":
         record = context["pending_record"]
         details = record["details"]
@@ -533,10 +548,6 @@ def _handle_dnd_creation(state: SessionState, user_message: str) -> str:
 
     if step == "name":
         form["name"] = value
-        context["step"] = "player_name"
-        return _prompt_for_dnd_step("player_name", context)
-    if step == "player_name":
-        form["player_name"] = value
         context["step"] = "race"
         return _prompt_for_dnd_step("race", context)
     if step == "race":
@@ -544,8 +555,6 @@ def _handle_dnd_creation(state: SessionState, user_message: str) -> str:
         context["step"] = "class"
         return _prompt_for_dnd_step("class", context)
     if step == "class":
-        if value.lower() not in DND_CLASS_NAMES:
-            return _prompt_for_dnd_step("class", context)
         form["class"] = value
         context["step"] = "background"
         return _prompt_for_dnd_step("background", context)
@@ -558,8 +567,8 @@ def _handle_dnd_creation(state: SessionState, user_message: str) -> str:
         context["step"] = "ability_method"
         return _prompt_for_dnd_step("ability_method", context)
     if step == "ability_method":
-        method = value.lower()
-        if method not in {"roll", "pointbuy", "manual"}:
+        method = normalize_dnd_ability_method(value)
+        if method not in DND_ABILITY_METHOD_OPTIONS:
             return _prompt_for_dnd_step("ability_method", context)
         form["ability_method"] = method
         context["step"] = "scores"
@@ -593,10 +602,6 @@ def _handle_coc_creation(state: SessionState, user_message: str) -> str:
 
     if step == "name":
         form["name"] = value
-        context["step"] = "player_name"
-        return _prompt_for_coc_step("player_name", context)
-    if step == "player_name":
-        form["player_name"] = value
         context["step"] = "era"
         return _prompt_for_coc_step("era", context)
     if step == "era":

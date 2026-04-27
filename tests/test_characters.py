@@ -37,13 +37,13 @@ class CharacterStorageTests(unittest.TestCase):
             {
                 "name": "Aldric",
                 "player_name": "Tester",
-                "race": "Human",
-                "class": "fighter",
-                "background": "Soldier",
+                "race": "人类",
+                "class": "战士",
+                "background": "士兵",
                 "alignment": "Lawful Good",
-                "ability_method": "manual",
+                "ability_method": "手动输入",
                 "scores": {"STR": 15, "DEX": 14, "CON": 13, "INT": 12, "WIS": 10, "CHA": 8},
-                "proficiencies": "Athletics, Survival",
+                "proficiencies": "运动, 求生",
             },
         )
         saved = characters.save_character_record(record)
@@ -56,6 +56,7 @@ class CharacterStorageTests(unittest.TestCase):
         self.assertTrue(campaign_records[0]["is_compatible_with_current_campaign"])
         self.assertEqual(len(all_records), 1)
         self.assertEqual(all_records[0]["campaign"], "alpha")
+        self.assertEqual(all_records[0]["details"]["class_display"], "战士")
 
     def test_coc_character_helper_derives_stats(self):
         payload = coc_character.build_coc_character(

@@ -19,9 +19,83 @@ DND_POINT_BUY_COST = {8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9}
 DND_SKILL_NAMES = sorted(dnd5e_character.SKILLS)
 DND_CLASS_NAMES = sorted(dnd5e_character.HIT_DICE)
 
+DND_RACE_OPTIONS = {
+    "human": {"label": "人类", "desc": "适应力强，背景灵活，适合几乎所有职业路线。"},
+    "elf": {"label": "精灵", "desc": "敏锐、优雅，常见于游侠、游荡者与施法职业。"},
+    "dwarf": {"label": "矮人", "desc": "坚韧耐打，适合前线战斗与防守型角色。"},
+    "halfling": {"label": "半身人", "desc": "机敏而幸运，常见于潜行与社交型角色。"},
+    "dragonborn": {"label": "龙裔", "desc": "带有龙族血统，气势强，适合近战与威慑路线。"},
+    "gnome": {"label": "侏儒", "desc": "聪明而好奇，常见于法师、工匠或研究者。"},
+    "halfelf": {"label": "半精灵", "desc": "兼具魅力与适应力，擅长社交和多面发展。"},
+    "halforc": {"label": "半兽人", "desc": "力量与凶猛兼备，适合野蛮人或战士。"},
+    "tiefling": {"label": "提夫林", "desc": "带有异界血统，天生神秘，常见于术士与魅力型角色。"},
+}
+
+DND_CLASS_OPTIONS = {
+    "barbarian": {"label": "野蛮人", "desc": "怒气驱动的近战猛将，血厚、伤害高。"},
+    "bard": {"label": "吟游诗人", "desc": "以表演、知识和法术支援队伍的全能型角色。"},
+    "cleric": {"label": "牧师", "desc": "侍奉神祇的施法者，兼具治疗、辅助和神圣打击。"},
+    "druid": {"label": "德鲁伊", "desc": "亲近自然，能施法并化身野兽。"},
+    "fighter": {"label": "战士", "desc": "武器专精的稳定前线，是最直观的战斗职业。"},
+    "monk": {"label": "武僧", "desc": "依靠身法与气运战斗，擅长机动与连击。"},
+    "paladin": {"label": "圣武士", "desc": "以誓言和信念作战，兼具防御、治疗与爆发。"},
+    "ranger": {"label": "游侠", "desc": "擅长追踪、生存和远近兼修的荒野猎手。"},
+    "rogue": {"label": "游荡者", "desc": "擅长潜行、巧技与精准爆发，适合侦查与渗透。"},
+    "sorcerer": {"label": "术士", "desc": "天生拥有魔力，法术爆发强，资源管理直接。"},
+    "warlock": {"label": "邪术师", "desc": "与超自然存在立约换取力量，风格鲜明。"},
+    "wizard": {"label": "法师", "desc": "依赖知识与法术书的经典施法者，法术选择最丰富。"},
+}
+
+DND_BACKGROUND_OPTIONS = {
+    "acolyte": {"label": "侍僧", "desc": "来自宗教团体，熟悉教会、人脉与仪式。"},
+    "charlatan": {"label": "骗子", "desc": "靠话术与伪装生存，擅长欺骗和身份切换。"},
+    "criminal": {"label": "罪犯", "desc": "熟悉地下世界、潜行、黑市和见不得光的手段。"},
+    "entertainer": {"label": "艺人", "desc": "擅长演出、取悦观众和吸引注意力。"},
+    "folkhero": {"label": "民间英雄", "desc": "出身平民却做过壮举，容易赢得普通人的信任。"},
+    "guildartisan": {"label": "行会工匠", "desc": "有稳定手艺和行业关系，适合社会化发展。"},
+    "hermit": {"label": "隐士", "desc": "独居避世，往往掌握隐秘知识或个人启示。"},
+    "noble": {"label": "贵族", "desc": "出身上层社会，拥有礼仪、资源和社会关系。"},
+    "outlander": {"label": "荒野流浪者", "desc": "擅长野外求生、追踪和远行。"},
+    "sage": {"label": "贤者", "desc": "学识丰富，适合知识调查与奥秘研究。"},
+    "sailor": {"label": "水手", "desc": "熟悉航海、港口和粗粝的集体生活。"},
+    "soldier": {"label": "士兵", "desc": "接受过军事训练，懂纪律、战术和军旅关系。"},
+    "urchin": {"label": "街头孤儿", "desc": "从底层求生，擅长潜行、偷盗和城市穿梭。"},
+}
+
+DND_ABILITY_METHOD_OPTIONS = {
+    "roll": {"label": "掷骰", "desc": "使用 4d6 去最低，随机性强，更有命运感。"},
+    "pointbuy": {"label": "购点", "desc": "27 点购点，平衡稳定，适合精确规划。"},
+    "manual": {"label": "手动输入", "desc": "直接给出属性，适合你已经想好具体数值。"},
+}
+
+DND_SKILL_DISPLAY = {
+    "Acrobatics": {"label": "体操", "desc": "平衡、翻滚、脱困等灵巧动作。"},
+    "Animal Handling": {"label": "驯兽", "desc": "安抚、控制或理解动物。"},
+    "Arcana": {"label": "奥秘", "desc": "有关法术、魔法与异界知识。"},
+    "Athletics": {"label": "运动", "desc": "攀爬、跳跃、游泳和纯体能表现。"},
+    "Deception": {"label": "欺瞒", "desc": "撒谎、误导与伪装。"},
+    "History": {"label": "历史", "desc": "文明、战争、王国与过去事件知识。"},
+    "Insight": {"label": "洞悉", "desc": "判断他人动机和情绪变化。"},
+    "Intimidation": {"label": "威吓", "desc": "以气势、威胁或压迫迫使对方退让。"},
+    "Investigation": {"label": "调查", "desc": "搜查线索、推理痕迹、分析信息。"},
+    "Medicine": {"label": "医药", "desc": "诊断伤病、急救与基础医学判断。"},
+    "Nature": {"label": "自然", "desc": "野外、生物、地形与自然现象知识。"},
+    "Perception": {"label": "察觉", "desc": "主动发现声音、动静、陷阱与异常。"},
+    "Performance": {"label": "表演", "desc": "歌唱、演奏、戏剧和公开表演。"},
+    "Persuasion": {"label": "游说", "desc": "以真诚、礼仪或逻辑说服他人。"},
+    "Religion": {"label": "宗教", "desc": "神祇、仪式、圣职与神圣传统知识。"},
+    "Sleight of Hand": {"label": "巧手", "desc": "扒窃、藏物、手上把戏。"},
+    "Stealth": {"label": "隐匿", "desc": "潜行、藏身、无声移动。"},
+    "Survival": {"label": "求生", "desc": "追踪、觅食、辨路和野外生存。"},
+}
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _normalize_lookup_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "", value.strip().casefold())
 
 
 def slugify_character_name(value: str) -> str:
@@ -173,6 +247,87 @@ def parse_choice_list(raw_value: str) -> list[str]:
     return items
 
 
+def _build_alias_map(options: dict[str, dict[str, str]], extra_aliases: dict[str, list[str]] | None = None) -> dict[str, str]:
+    alias_map: dict[str, str] = {}
+    for canonical, meta in options.items():
+        keys = {canonical, meta["label"], f"{canonical} {meta['label']}", f"{meta['label']} {canonical}"}
+        for key in keys:
+            alias_map[_normalize_lookup_key(key)] = canonical
+    if extra_aliases:
+        for canonical, aliases in extra_aliases.items():
+            for alias in aliases:
+                alias_map[_normalize_lookup_key(alias)] = canonical
+    return alias_map
+
+
+_DND_RACE_ALIAS_MAP = _build_alias_map(
+    DND_RACE_OPTIONS,
+    {
+        "halfelf": ["half elf", "半精灵"],
+        "halforc": ["half orc", "半兽人"],
+        "dragonborn": ["dragon born", "龙裔"],
+        "tiefling": ["提夫林", "魔裔"],
+    },
+)
+_DND_CLASS_ALIAS_MAP = _build_alias_map(
+    DND_CLASS_OPTIONS,
+    {
+        "fighter": ["warrior", "战士"],
+        "rogue": ["thief", "盗贼", "游荡者"],
+        "sorcerer": ["sorceror", "术士"],
+        "warlock": ["邪术师"],
+        "cleric": ["priest", "牧师"],
+        "paladin": ["圣骑士", "圣武士"],
+        "ranger": ["游侠"],
+        "wizard": ["mage", "法师"],
+        "barbarian": ["野蛮人"],
+        "bard": ["吟游诗人"],
+        "druid": ["德鲁伊"],
+        "monk": ["武僧"],
+    },
+)
+_DND_BACKGROUND_ALIAS_MAP = _build_alias_map(
+    DND_BACKGROUND_OPTIONS,
+    {
+        "guildartisan": ["guild artisan", "行会工匠"],
+        "folkhero": ["folk hero", "民间英雄"],
+        "outlander": ["荒野流浪者"],
+        "urchin": ["街头孤儿"],
+    },
+)
+_DND_METHOD_ALIAS_MAP = _build_alias_map(
+    DND_ABILITY_METHOD_OPTIONS,
+    {
+        "roll": ["掷骰", "骰点", "随机", "4d6"],
+        "pointbuy": ["点购", "购点", "point buy", "27点"],
+        "manual": ["手动", "手填", "直接输入", "自定义"],
+    },
+)
+_DND_SKILL_ALIAS_MAP = _build_alias_map(
+    DND_SKILL_DISPLAY,
+    {
+        "Animal Handling": ["驯养动物"],
+        "Arcana": ["奥术", "奥秘"],
+        "History": ["历史"],
+        "Insight": ["洞察", "洞悉"],
+        "Investigation": ["侦查", "调查"],
+        "Medicine": ["医疗", "医药"],
+        "Nature": ["自然"],
+        "Perception": ["观察", "察觉"],
+        "Persuasion": ["说服", "游说"],
+        "Religion": ["宗教"],
+        "Sleight of Hand": ["手上把戏", "巧手"],
+        "Stealth": ["潜行", "隐匿"],
+        "Survival": ["生存", "求生"],
+        "Intimidation": ["威胁", "威吓"],
+        "Performance": ["表演"],
+        "Acrobatics": ["杂技", "体操"],
+        "Athletics": ["运动"],
+        "Deception": ["欺诈", "欺瞒"],
+    },
+)
+
+
 def validate_dnd_scores(scores: dict[str, int], method: str) -> None:
     for stat, value in scores.items():
         if value < 3 or value > 20:
@@ -192,20 +347,50 @@ def validate_dnd_scores(scores: dict[str, int], method: str) -> None:
 
 
 def _normalize_dnd_class(value: str) -> str:
-    cleaned = value.strip().lower()
+    cleaned = _DND_CLASS_ALIAS_MAP.get(_normalize_lookup_key(value), value.strip().lower())
     if cleaned not in dnd5e_character.HIT_DICE:
         raise ValueError(f"暂不支持职业：{value}。可选：{', '.join(DND_CLASS_NAMES)}。")
     return cleaned
 
 
+def normalize_dnd_race(value: str) -> str:
+    cleaned = _DND_RACE_ALIAS_MAP.get(_normalize_lookup_key(value))
+    if cleaned:
+        return DND_RACE_OPTIONS[cleaned]["label"]
+    return value.strip()
+
+
+def normalize_dnd_background(value: str) -> str:
+    cleaned = _DND_BACKGROUND_ALIAS_MAP.get(_normalize_lookup_key(value))
+    if cleaned:
+        return DND_BACKGROUND_OPTIONS[cleaned]["label"]
+    return value.strip()
+
+
+def normalize_dnd_ability_method(value: str) -> str:
+    cleaned = _DND_METHOD_ALIAS_MAP.get(_normalize_lookup_key(value))
+    if cleaned:
+        return cleaned
+    return value.strip().lower()
+
+
 def _normalize_dnd_proficiencies(raw_value: str) -> list[str]:
     selected = []
-    valid_map = {name.casefold(): name for name in DND_SKILL_NAMES}
     for item in parse_choice_list(raw_value):
-        normalized = valid_map.get(item.casefold())
+        normalized = _DND_SKILL_ALIAS_MAP.get(_normalize_lookup_key(item))
         if normalized and normalized not in selected:
             selected.append(normalized)
     return selected
+
+
+def describe_dnd_options(options: dict[str, dict[str, str]]) -> str:
+    return "\n".join(f"- {key}: {meta['label']}。{meta['desc']}" for key, meta in options.items())
+
+
+def describe_dnd_skills() -> str:
+    return "\n".join(
+        f"- {skill}: {meta['label']}。{meta['desc']}" for skill, meta in DND_SKILL_DISPLAY.items()
+    )
 
 
 def _format_modifier(value: int) -> str:
@@ -273,11 +458,11 @@ def _build_dnd_markdown(record: dict[str, Any], details: dict[str, Any]) -> str:
 def build_dnd_character_record(campaign_name: str, data: dict[str, Any]) -> dict[str, Any]:
     name = str(data["name"]).strip()
     player_name = str(data["player_name"]).strip()
-    race = str(data["race"]).strip()
+    race = normalize_dnd_race(str(data["race"]).strip())
     char_class = _normalize_dnd_class(str(data["class"]).strip())
-    background = str(data["background"]).strip()
+    background = normalize_dnd_background(str(data["background"]).strip())
     alignment = str(data.get("alignment", "")).strip() or "未指定"
-    ability_method = str(data["ability_method"]).strip().lower()
+    ability_method = normalize_dnd_ability_method(str(data["ability_method"]).strip())
     scores = {stat: int(value) for stat, value in dict(data["scores"]).items()}
     validate_dnd_scores(scores, ability_method)
     proficiencies = _normalize_dnd_proficiencies(str(data.get("proficiencies", "")))
@@ -303,15 +488,11 @@ def build_dnd_character_record(campaign_name: str, data: dict[str, Any]) -> dict
     details = {
         "race": race,
         "class": char_class,
-        "class_display": char_class.title(),
+        "class_display": DND_CLASS_OPTIONS.get(char_class, {}).get("label", char_class.title()),
         "background": background,
         "alignment": alignment,
         "ability_method": ability_method,
-        "ability_method_label": {
-            "roll": "4d6 去最低",
-            "pointbuy": "27 点购点",
-            "manual": "手动输入",
-        }.get(ability_method, ability_method),
+        "ability_method_label": DND_ABILITY_METHOD_OPTIONS.get(ability_method, {}).get("label", ability_method),
         "scores": scores,
         "modifiers": modifiers,
         "proficiencies": proficiencies,
