@@ -31,6 +31,12 @@
           </svg>
           <span>游戏室</span>
         </button>
+        <button class="nav-link" type="button" data-view-target="characters">
+          <svg class="icon" aria-hidden="true">
+            <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-user"></use>
+          </svg>
+          <span>我的角色</span>
+        </button>
         <button class="nav-link" type="button" data-view-target="config">
           <svg class="icon" aria-hidden="true">
             <use href="{{ url_for('static', filename='icons/sprite.svg') }}#icon-config"></use>
@@ -172,6 +178,7 @@
                 <h3 id="chat-campaign">{{ snapshot.current_campaign.name if snapshot.current_campaign else "等待载入战役" }}</h3>
               </div>
               <div class="panel-actions">
+                <span class="chip" id="chat-character">{{ snapshot.active_character.name if snapshot.active_character else "待建角" }}</span>
                 <span class="chip" id="chat-system">{{ snapshot.current_campaign.system_label if snapshot.current_campaign else "SYSTEM OFFLINE" }}</span>
                 <button class="button secondary" id="save-campaign-button" type="button" {% if not snapshot.current_campaign %}disabled{% endif %}>
                   <svg class="icon" aria-hidden="true">
@@ -349,6 +356,61 @@
               <p class="panel-copy" id="status-message">{{ snapshot.status_message }}</p>
             </section>
           </aside>
+        </div>
+      </section>
+
+      <section class="view-stage" data-view="characters">
+        <header class="stage-header">
+          <div>
+            <p class="eyebrow">我的角色</p>
+            <h2>全局角色库</h2>
+          </div>
+          <p class="stage-copy">显示所有战役中已创建的角色，并标记是否可用于当前加载战役。</p>
+        </header>
+
+        <div class="stage-grid">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">角色列表</p>
+                <h3>Character Registry</h3>
+              </div>
+              <span class="chip" id="character-count">{{ snapshot.my_characters | length }} 个角色</span>
+            </div>
+            <div class="character-grid" id="character-grid">
+              {% include "partials/character_cards.html" %}
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">兼容性</p>
+                <h3>Usage Rules</h3>
+              </div>
+            </div>
+            <p class="panel-copy" id="character-panel-copy">
+              {% if snapshot.current_campaign %}
+                当前战役为 {{ snapshot.current_campaign.name }}。只有同战役角色可直接用于本次会话。
+              {% else %}
+                当前未加载战役。加载后会标记哪些角色可直接用于当前会话。
+              {% endif %}
+            </p>
+            <div class="status-ledger compact">
+              <div>
+                <span class="ledger-label">当前战役</span>
+                <strong id="characters-current-campaign">{{ snapshot.current_campaign.name if snapshot.current_campaign else "未载入" }}</strong>
+              </div>
+              <div>
+                <span class="ledger-label">可用角色</span>
+                <strong id="characters-compatible-count">{{ snapshot.campaign_characters | length }}</strong>
+              </div>
+              <div>
+                <span class="ledger-label">当前使用</span>
+                <strong id="characters-active-character">{{ snapshot.active_character.name if snapshot.active_character else "待选择" }}</strong>
+              </div>
+            </div>
+          </section>
         </div>
       </section>
 

@@ -296,12 +296,36 @@ svg {
   gap: var(--space-md);
 }
 
+.character-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-md);
+}
+
 .campaign-card,
 .empty-card {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
   padding: var(--space-lg);
+}
+
+.character-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  border: 1px solid var(--border-visible);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.character-card.is-compatible {
+  border-color: var(--success);
+}
+
+.character-card.is-readonly {
+  border-color: var(--border-visible);
 }
 
 .card-header {
@@ -325,6 +349,12 @@ svg {
 
 .card-copy {
   margin: 0;
+}
+
+.character-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
 }
 
 .card-actions {

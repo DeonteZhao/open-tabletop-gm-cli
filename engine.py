@@ -15,6 +15,7 @@ class Engine:
         
         self.messages = []
         self.system_prompt_initialized = False
+        self.active_character_name = ""
 
     def refresh_config(self):
         self.config = get_config(prefer_env=self.prefer_env_config)
@@ -51,6 +52,12 @@ class Engine:
             if filepath.exists():
                 content = filepath.read_text(encoding="utf-8")
                 prompt_parts.append(f"--- {filename} ---\n{content}\n")
+
+        characters_dir = self.campaign_path / "characters"
+        if characters_dir.exists():
+            for filepath in sorted(characters_dir.glob("*.md")):
+                content = filepath.read_text(encoding="utf-8")
+                prompt_parts.append(f"--- characters/{filepath.name} ---\n{content}\n")
                 
         # 4. Global instructions
         prompt_parts.append(
@@ -63,6 +70,11 @@ class Engine:
             "to execute scripts and update the display. Do NOT write ```bash code blocks. "
             "Use `display_send` to push your narration and stat updates to the screen companion."
         )
+        if self.active_character_name:
+            prompt_parts.append(
+                f"Current active player character: {self.active_character_name}. "
+                "Address the player as this character when appropriate and frame the opening around them."
+            )
                 
         return "\n\n".join(prompt_parts)
 
@@ -70,6 +82,20 @@ class Engine:
         system_prompt = self.build_system_prompt()
         self.messages = [{"role": "system", "content": system_prompt}]
         self.system_prompt_initialized = True
+
+    def set_active_character(self, character_name: str):
+        self.active_character_name = character_name.strip()
+        self.system_prompt_initialized = False
+
+    def start_session_intro(self, active_character_name: str) -> str:
+        self.set_active_character(active_character_name)
+        self.initialize_chat()
+        intro_prompt = (
+            "Please give a short introductory greeting and describe the current scene "
+            "to start the session. You must reply in Chinese. "
+            f"The active player character is {active_character_name}."
+        )
+        return self.chat(intro_prompt)
 
     def get_tools_definition(self):
         return [

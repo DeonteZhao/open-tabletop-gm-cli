@@ -33,9 +33,16 @@
     chatSubmit: document.getElementById("chat-submit"),
     chatLog: document.getElementById("chat-log"),
     chatCampaign: document.getElementById("chat-campaign"),
+    chatCharacter: document.getElementById("chat-character"),
     chatSystem: document.getElementById("chat-system"),
     saveCampaignButton: document.getElementById("save-campaign-button"),
     deleteCurrentCampaignButton: document.getElementById("delete-current-campaign-button"),
+    characterGrid: document.getElementById("character-grid"),
+    characterCount: document.getElementById("character-count"),
+    charactersCurrentCampaign: document.getElementById("characters-current-campaign"),
+    charactersCompatibleCount: document.getElementById("characters-compatible-count"),
+    charactersActiveCharacter: document.getElementById("characters-active-character"),
+    characterPanelCopy: document.getElementById("character-panel-copy"),
     configForm: document.getElementById("config-form"),
     provider: document.getElementById("config-provider"),
     apiKey: document.getElementById("config-api-key"),
@@ -374,9 +381,69 @@
       .join("");
   }
 
+  function renderCharacters() {
+    if (!elements.characterGrid || !elements.characterCount) {
+      return;
+    }
+    const characters = Array.isArray(state.my_characters) ? state.my_characters : [];
+    const currentCampaign = state.current_campaign && state.current_campaign.name;
+    const compatibleCount = Array.isArray(state.campaign_characters) ? state.campaign_characters.length : 0;
+    elements.characterCount.textContent = `${characters.length} 个角色`;
+
+    if (elements.charactersCurrentCampaign) {
+      elements.charactersCurrentCampaign.textContent = currentCampaign || "未载入";
+    }
+    if (elements.charactersCompatibleCount) {
+      elements.charactersCompatibleCount.textContent = String(compatibleCount);
+    }
+    if (elements.charactersActiveCharacter) {
+      elements.charactersActiveCharacter.textContent = state.active_character ? state.active_character.name : "待选择";
+    }
+    if (elements.characterPanelCopy) {
+      elements.characterPanelCopy.textContent = currentCampaign
+        ? `当前战役为 ${currentCampaign}。只有同战役角色可直接用于本次会话。`
+        : "当前未加载战役。加载后会标记哪些角色可直接用于当前会话。";
+    }
+
+    if (!characters.length) {
+      elements.characterGrid.innerHTML = [
+        '<article class="empty-card">',
+        '<p class="eyebrow">空状态</p>',
+        "<h3>暂无角色</h3>",
+        "<p class=\"card-copy\">加载战役后在聊天里完成建角，这里会自动汇总你的角色。</p>",
+        "</article>",
+      ].join("");
+      return;
+    }
+
+    elements.characterGrid.innerHTML = characters
+      .map((character) => {
+        const compatible = Boolean(character.is_compatible_with_current_campaign);
+        return [
+          `<article class="character-card ${compatible ? "is-compatible" : "is-readonly"}">`,
+          '<div class="card-header">',
+          "<div>",
+          '<p class="eyebrow">角色</p>',
+          `<h3 class="campaign-card-title">${escapeHtml(character.name || "")}</h3>`,
+          "</div>",
+          `<span class="chip">${escapeHtml(character.system_label || "")}</span>`,
+          "</div>",
+          `<p class="card-copy">${escapeHtml(character.summary || "")}</p>`,
+          '<div class="character-meta">',
+          `<span class="chip chip-tone-neutral">${escapeHtml(character.campaign || "")}</span>`,
+          `<span class="chip ${compatible ? "chip-tone-success" : "chip-tone-warning"}">${compatible ? "当前战役可用" : "仅限所属战役"}</span>`,
+          "</div>",
+          `<p class="field-hint">玩家：${escapeHtml(character.player_name || "")} / 更新：${escapeHtml(character.updated_at || "")}</p>`,
+          "</article>",
+        ].join("");
+      })
+      .join("");
+  }
+
   function renderChat() {
     const history = Array.isArray(state.chat_history) ? state.chat_history : [];
     const isLoadingCampaign = Boolean(uiState.loadingCampaignName);
+    const guide = state.character_guide || {};
     elements.chatSubmit.disabled = !state.chat_ready || isLoadingCampaign;
     elements.chatInput.disabled = !state.chat_ready || isLoadingCampaign;
     if (elements.saveCampaignButton) {
@@ -388,13 +455,34 @@
 
     if (isLoadingCampaign) {
       elements.chatCampaign.textContent = uiState.loadingCampaignName;
+      if (elements.chatCharacter) {
+        elements.chatCharacter.textContent = "待建角";
+      }
       elements.chatSystem.textContent = "INITIALIZING";
     } else if (state.current_campaign) {
       elements.chatCampaign.textContent = state.current_campaign.name;
+      if (elements.chatCharacter) {
+        elements.chatCharacter.textContent = state.active_character ? state.active_character.name : "待建角";
+      }
       elements.chatSystem.textContent = state.current_campaign.system_label;
     } else {
       elements.chatCampaign.textContent = "等待载入战役";
+      if (elements.chatCharacter) {
+        elements.chatCharacter.textContent = "待建角";
+      }
       elements.chatSystem.textContent = "SYSTEM OFFLINE";
+    }
+
+    if (elements.chatSubmit) {
+      const labelNode = elements.chatSubmit.querySelector("span");
+      if (labelNode) {
+        labelNode.textContent = guide.active ? "提交回答" : "发送行动";
+      }
+    }
+    if (elements.chatInput) {
+      elements.chatInput.placeholder = guide.active
+        ? "按引导输入当前步骤内容，例如角色名、属性或确认。"
+        : "输入你想做的事情，例如：我环顾四周，检查桌上的手稿。";
     }
 
     if (isLoadingCampaign) {
@@ -415,7 +503,7 @@
         '<p class="eyebrow">待机</p>',
         renderIcon("chat", "icon icon-empty"),
         "<h3>尚未进入战役</h3>",
-        "<p class=\"card-copy\">加载战役后会在这里显示开场白与后续聊天记录。</p>",
+        `<p class="card-copy">${guide.active ? "加载战役后会先在这里进行选角或建角引导。" : "加载战役后会在这里显示开场白与后续聊天记录。"}</p>`,
         "</article>",
       ].join("");
       return;
@@ -461,7 +549,7 @@
       elements.statusReady.textContent = "加载中";
       elements.statusMessage.textContent = `正在载入战役：${uiState.loadingCampaignName}`;
     } else {
-      elements.statusReady.textContent = state.chat_ready ? "在线" : "待命";
+      elements.statusReady.textContent = state.character_guide && state.character_guide.active ? "建角中" : (state.chat_ready ? "在线" : "待命");
       elements.statusMessage.textContent = state.status_message || "等待操作。";
     }
 
@@ -638,6 +726,7 @@
 
   function renderAll() {
     renderCampaigns();
+    renderCharacters();
     renderChat();
     renderStatus();
     renderConfig();

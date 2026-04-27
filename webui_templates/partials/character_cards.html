@@ -1,0 +1,29 @@
+{% if snapshot.my_characters %}
+  {% for character in snapshot.my_characters %}
+    <article class="character-card {% if character.is_compatible_with_current_campaign %}is-compatible{% else %}is-readonly{% endif %}">
+      <div class="card-header">
+        <div>
+          <p class="eyebrow">角色</p>
+          <h3 class="campaign-card-title">{{ character.name }}</h3>
+        </div>
+        <span class="chip">{{ character.system_label }}</span>
+      </div>
+      <p class="card-copy">{{ character.summary }}</p>
+      <div class="character-meta">
+        <span class="chip chip-tone-neutral">{{ character.campaign }}</span>
+        {% if character.is_compatible_with_current_campaign %}
+          <span class="chip chip-tone-success">当前战役可用</span>
+        {% else %}
+          <span class="chip chip-tone-warning">仅限所属战役</span>
+        {% endif %}
+      </div>
+      <p class="field-hint">玩家：{{ character.player_name }} / 更新：{{ character.updated_at }}</p>
+    </article>
+  {% endfor %}
+{% else %}
+  <article class="empty-card">
+    <p class="eyebrow">空状态</p>
+    <h3>暂无角色</h3>
+    <p class="card-copy">加载战役后在聊天里完成建角，这里会自动汇总你的角色。</p>
+  </article>
+{% endif %}

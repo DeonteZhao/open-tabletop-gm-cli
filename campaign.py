@@ -19,6 +19,7 @@ def create_campaign(name: str, system: str = "dnd5e"):
     try:
         # Create campaign directory
         campaign_path.mkdir(parents=True, exist_ok=True)
+        (campaign_path / "characters").mkdir(exist_ok=True)
         
         # Copy template files
         for item in TEMPLATES_DIR.iterdir():
