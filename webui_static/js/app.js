@@ -47,6 +47,8 @@
     characterPanelCopy: document.getElementById("character-panel-copy"),
     configForm: document.getElementById("config-form"),
     provider: document.getElementById("config-provider"),
+    baseUrl: document.getElementById("config-base-url"),
+    baseUrlField: document.getElementById("config-base-url-field"),
     apiKey: document.getElementById("config-api-key"),
     apiKeyToggle: document.getElementById("config-api-key-toggle"),
     apiKeyHint: document.getElementById("config-api-key-hint"),
@@ -718,6 +720,9 @@
   function renderConfig() {
     const config = state.config || {};
     elements.provider.value = config.provider || "openai";
+    if (elements.baseUrl) {
+      elements.baseUrl.value = config.base_url || "";
+    }
     elements.model.value = config.model || "";
     elements.apiKey.placeholder = config.api_key_configured ? "已存在，留空则保持不变" : "sk-...";
     if (elements.apiKeyToggle) {
@@ -743,12 +748,22 @@
       return;
     }
 
-    const baseUrl = selectedOption.dataset.baseUrl || "";
+    const isCustom = elements.provider.value === "custom";
+    const baseUrl = isCustom ? (elements.baseUrl?.value || "") : (selectedOption.dataset.baseUrl || "");
     const modelPlaceholder = selectedOption.dataset.modelPlaceholder || "gpt-4o";
     elements.model.placeholder = modelPlaceholder;
+    if (elements.baseUrl) {
+      elements.baseUrl.disabled = !isCustom;
+      if (!isCustom) {
+        elements.baseUrl.value = selectedOption.dataset.baseUrl || "";
+      }
+    }
+    if (elements.baseUrlField) {
+      elements.baseUrlField.classList.toggle("is-muted", !isCustom);
+    }
 
     if (elements.providerHint) {
-      elements.providerHint.textContent = `当前提供商地址：${baseUrl}`;
+      elements.providerHint.textContent = `当前提供商地址：${baseUrl || "请填写自定义 Base URL"}`;
     }
   }
 
@@ -966,6 +981,7 @@
       api_key: uiState.apiKeyModified ? elements.apiKey.value : "",
       api_key_modified: uiState.apiKeyModified,
       model: elements.model.value,
+      base_url: elements.baseUrl ? elements.baseUrl.value : "",
     };
 
     try {
@@ -987,6 +1003,12 @@
   elements.provider.addEventListener("change", () => {
     renderProviderHint();
   });
+
+  if (elements.baseUrl) {
+    elements.baseUrl.addEventListener("input", () => {
+      renderProviderHint();
+    });
+  }
 
   if (elements.importSourceTrigger) {
     elements.importSourceTrigger.addEventListener("click", () => {

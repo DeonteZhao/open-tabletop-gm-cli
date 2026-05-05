@@ -83,7 +83,8 @@ class CharacterStorageTests(unittest.TestCase):
         self.assertEqual(beta_records[0]["name"], "Aldric")
         self.assertTrue(beta_records[0]["is_compatible_with_current_campaign"])
         self.assertEqual(beta_records[0]["origin_campaign"], "alpha")
-        self.assertIn("characters\\dnd5e\\aldric.md", saved["sheet_path"])
+        expected_suffix = str(Path("characters") / "dnd5e" / "aldric.md")
+        self.assertTrue(saved["sheet_path"].endswith(expected_suffix))
 
     def test_different_system_characters_are_not_reused(self):
         self.assertTrue(campaign.create_campaign("alpha", "dnd5e"))

@@ -1,4 +1,5 @@
 import shutil
+from datetime import datetime
 from pathlib import Path
 
 CAMPAIGNS_DIR = Path.home() / ".local" / "share" / "open-tabletop-gm" / "campaigns"
@@ -37,7 +38,7 @@ def create_campaign(name: str, system: str = "dnd5e"):
         print(f"Failed to create campaign '{name}': {e}")
         return False
 
-def save_campaign_state(campaign_name: str) -> Path:
+def _require_campaign_path(campaign_name: str) -> Path:
     campaign_name = campaign_name.strip()
     if not campaign_name:
         raise ValueError("Campaign name cannot be empty.")
@@ -45,18 +46,43 @@ def save_campaign_state(campaign_name: str) -> Path:
     campaign_path = CAMPAIGNS_DIR / campaign_name
     if not campaign_path.exists():
         raise FileNotFoundError(f"Campaign '{campaign_name}' does not exist.")
+    return campaign_path
 
+
+def append_session_log_turn(campaign_name: str, player_text: str, gm_text: str) -> Path:
+    campaign_path = _require_campaign_path(campaign_name)
+    log_file = campaign_path / "session-log.md"
+    if log_file.exists():
+        content = log_file.read_text(encoding="utf-8")
+    else:
+        content = f"# Session Log — {campaign_name}\n"
+
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    entry = (
+        f"\n\n---\n\n"
+        f"### Turn — {timestamp}\n"
+        f"**Player:** {player_text.strip()}\n\n"
+        f"**GM:** {gm_text.strip()}\n"
+    )
+    log_file.write_text(content.rstrip() + entry + "\n", encoding="utf-8")
+    return log_file
+
+
+def save_campaign_state(campaign_name: str, summary: str | None = None) -> Path:
+    campaign_path = _require_campaign_path(campaign_name)
     state_file = campaign_path / "state.md"
     if state_file.exists():
         content = state_file.read_text(encoding="utf-8")
     else:
         content = ""
 
-    save_note = "- State saved by user command.\n"
-    if content and not content.endswith("\n"):
-        content += "\n"
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    if summary and summary.strip():
+        save_block = f"\n\n---\n\n## Web Save — {timestamp}\n\n{summary.strip()}\n"
+    else:
+        save_block = f"\n\n---\n\n## Web Save — {timestamp}\n\n- 保存时没有可用摘要。\n"
 
-    state_file.write_text(content + save_note, encoding="utf-8")
+    state_file.write_text(content.rstrip() + save_block, encoding="utf-8")
     return state_file
 
 def delete_campaign(name: str) -> bool:

@@ -15,6 +15,7 @@ from werkzeug.utils import secure_filename
 
 from campaign import (
     CAMPAIGNS_DIR,
+    append_session_log_turn,
     create_campaign,
     delete_campaign,
     list_campaigns,
@@ -43,7 +44,7 @@ from characters import (
     save_character_record,
 )
 from config import CONFIG_FILE, Config, get_config
-from engine import Engine
+from engine import Engine, LLMError
 from importer import import_pdf
 from llm import get_provider_spec, list_provider_options, normalize_provider, provider_base_url, validate_llm_config
 
@@ -430,10 +431,10 @@ def _load_stored_api_key() -> str:
     return str(data.get("api_key", "")).strip()
 
 
-def save_config(provider: str, api_key: str, model: str, api_key_modified: bool = False) -> str:
+def save_config(provider: str, api_key: str, model: str, api_key_modified: bool = False, base_url: str = "") -> str:
     config = Config()
-    config.provider = normalize_provider(provider)
-    config.base_url = provider_base_url(config.provider)
+    config.provider = normalize_provider(provider, base_url)
+    config.base_url = provider_base_url(config.provider, base_url)
     if api_key_modified:
         config.api_key = api_key.strip()
     else:
@@ -458,7 +459,10 @@ def save_current_campaign() -> str:
     if not state.campaign_name:
         raise ValueError("当前没有已加载的战役可保存。")
 
-    save_campaign_state(state.campaign_name)
+    summary = None
+    if state.engine and hasattr(state.engine, "summarize_for_save"):
+        summary = state.engine.summarize_for_save()
+    save_campaign_state(state.campaign_name, summary)
     state.status_message = f"已保存战役：{state.campaign_name}"
     return state.status_message
 
@@ -823,18 +827,24 @@ def chat_with_gm(user_message: str) -> str:
     if not state.engine:
         raise ValueError("请先在战役大厅加载一个战役。")
 
-    if not user_message.strip():
+    clean_message = user_message.strip()
+    if not clean_message:
         raise ValueError("输入不能为空。")
 
-    state.chat_history.append({"role": "user", "content": user_message.strip()})
     if state.guide_state:
-        response = _handle_character_guide(state, user_message.strip())
-    else:
-        if not state.active_character_name:
-            raise ValueError("请先完成角色选择或创建。")
-        response = state.engine.chat(user_message.strip())
-        state.status_message = f"正在进行：{state.campaign_name} / {state.active_character_name}"
+        state.chat_history.append({"role": "user", "content": clean_message})
+        response = _handle_character_guide(state, clean_message)
+        state.chat_history.append({"role": "assistant", "content": response})
+        return response
+
+    if not state.active_character_name:
+        raise ValueError("请先完成角色选择或创建。")
+
+    response = state.engine.chat(clean_message)
+    state.chat_history.append({"role": "user", "content": clean_message})
     state.chat_history.append({"role": "assistant", "content": response})
+    append_session_log_turn(state.campaign_name, clean_message, response)
+    state.status_message = f"正在进行：{state.campaign_name} / {state.active_character_name}"
     return response
 
 
@@ -864,6 +874,7 @@ def save_config_route():
             payload.get("api_key", ""),
             payload.get("model", ""),
             bool(payload.get("api_key_modified", False)),
+            payload.get("base_url", ""),
         )
     except Exception as exc:
         return _json_error(f"保存配置失败: {exc}", 500)
@@ -900,6 +911,8 @@ def save_campaign_route():
         message = save_current_campaign()
     except ValueError as exc:
         return _json_error(str(exc), 400)
+    except LLMError as exc:
+        return _json_error(f"生成保存摘要失败: {exc}", 502)
     except Exception as exc:
         return _json_error(f"保存战役失败: {exc}", 500)
 
@@ -984,6 +997,8 @@ def chat_route():
         response = chat_with_gm(payload.get("message", ""))
     except ValueError as exc:
         return _json_error(str(exc), 400)
+    except LLMError as exc:
+        return _json_error(f"引擎通信错误: {exc}", 502)
     except Exception as exc:
         return _json_error(f"引擎通信错误: {exc}", 500)
 

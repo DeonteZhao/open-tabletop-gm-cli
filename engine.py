@@ -1,12 +1,17 @@
 import os
 import json
 from pathlib import Path
+from typing import Any
 
 from characters import list_system_characters, load_character_markdown_from_record
 from config import get_config
 from llm import create_llm_client
 from tools import execute_tool, get_project_root
 from campaign import CAMPAIGNS_DIR
+
+class LLMError(RuntimeError):
+    """Raised when the configured LLM provider cannot complete a request."""
+
 
 class Engine:
     def __init__(self, campaign_name: str, prefer_env_config: bool = True):
@@ -195,6 +200,37 @@ class Engine:
             }
         ]
 
+    def _message_to_text(self, message: Any) -> str:
+        if isinstance(message, dict):
+            return str(message.get("content") or "")
+        return str(getattr(message, "content", "") or "")
+
+    def summarize_for_save(self) -> str:
+        if not self.messages:
+            return "## Save Summary\n- 暂无可总结的会话内容。\n"
+
+        summary_prompt = (
+            "请基于当前对话，为 Web UI 保存战役长期记忆。"
+            "用中文 Markdown 输出，必须包含这些标题：\n"
+            "## Save Summary\n"
+            "## Current Situation\n"
+            "## Recent Events\n"
+            "## Open Threads\n"
+            "## NPC / Faction Memory\n"
+            "要求简洁、事实化，只记录已经发生或已建立的信息，不要创造新剧情。"
+        )
+        self.messages.append({"role": "user", "content": summary_prompt})
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=self.messages,
+            )
+            response_message = response.choices[0].message
+            self.messages.append(response_message)
+            return response_message.content or "## Save Summary\n- 当前模型未返回摘要。\n"
+        except Exception as e:
+            raise LLMError(f"Error communicating with LLM: {str(e)}") from e
+
     def chat(self, user_input: str) -> str:
         if not self.system_prompt_initialized:
             self.initialize_chat()
@@ -233,4 +269,4 @@ class Engine:
                     return response_message.content or ""
                     
             except Exception as e:
-                return f"Error communicating with LLM: {str(e)}"
+                raise LLMError(f"Error communicating with LLM: {str(e)}") from e

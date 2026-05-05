@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import json
 from typing import Dict, Any
 
@@ -16,13 +17,13 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> str:
     
     if tool_name == "dice":
         script_path = os.path.join(root, 'scripts', 'dice.py')
-        cmd = ["python", script_path, arguments.get("notation", "")]
+        cmd = [sys.executable, script_path, arguments.get("notation", "")]
         if arguments.get("silent"):
             cmd.append("--silent")
             
     elif tool_name == "combat":
         script_path = os.path.join(root, 'scripts', 'combat.py')
-        cmd = ["python", script_path, arguments.get("action", "")]
+        cmd = [sys.executable, script_path, arguments.get("action", "")]
         for key, value in arguments.items():
             if key != "action" and value is not None:
                 if key == "json_data":
@@ -33,7 +34,7 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> str:
                     
     elif tool_name == "tracker":
         script_path = os.path.join(root, 'scripts', 'tracker.py')
-        cmd = ["python", script_path, "-c", arguments.get("campaign", "default")]
+        cmd = [sys.executable, script_path, "-c", arguments.get("campaign", "default")]
         action = arguments.get("action", "")
         cmd.append(action)
         for key, value in arguments.items():
@@ -42,7 +43,7 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> str:
                 
     elif tool_name == "calendar":
         script_path = os.path.join(root, 'scripts', 'calendar.py')
-        cmd = ["python", script_path, "-c", arguments.get("campaign", "default")]
+        cmd = [sys.executable, script_path, "-c", arguments.get("campaign", "default")]
         action = arguments.get("action", "")
         cmd.append(action)
         for key, value in arguments.items():
@@ -52,12 +53,12 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> str:
                 
     elif tool_name == "lookup":
         script_path = os.path.join(root, 'systems', 'dnd5e', 'lookup.py')
-        cmd = ["python", script_path, arguments.get("category", ""), arguments.get("query", "")]
+        cmd = [sys.executable, script_path, arguments.get("category", ""), arguments.get("query", "")]
         
     elif tool_name == "display_send":
         # Send narration or stats to display/send.py
         script_path = os.path.join(root, 'display', 'send.py')
-        cmd = ["python", script_path]
+        cmd = [sys.executable, script_path]
         
         # Add flags
         if arguments.get("player"):

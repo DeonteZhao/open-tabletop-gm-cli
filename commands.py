@@ -15,7 +15,8 @@ def handle_help():
 
 def handle_save(engine):
     print("Saving game state...")
-    save_campaign_state(engine.campaign_name)
+    summary = engine.summarize_for_save() if hasattr(engine, "summarize_for_save") else None
+    save_campaign_state(engine.campaign_name, summary)
     print("Game state saved.")
 
 def handle_world(engine):
