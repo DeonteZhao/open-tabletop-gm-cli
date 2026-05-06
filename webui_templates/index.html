@@ -199,6 +199,8 @@
               {% include "partials/chat_log.html" %}
             </div>
 
+            <div class="character-guide-panel" id="character-guide-panel" hidden></div>
+
             <form id="chat-form" class="chat-composer">
               <label class="field grow">
                 <span>你的行动</span>
@@ -449,7 +451,12 @@
                   </option>
                   {% endfor %}
                 </select>
-                <p class="field-hint">根据模型商自动使用对应的 OpenAI-compatible 接口地址，无需手动填写 `base_url`。</p>
+                <p class="field-hint">内置模型商会自动使用对应 OpenAI-compatible 接口；选择“自定义”时请填写 Base URL。</p>
+              </label>
+              <label class="field" id="config-base-url-field">
+                <span>Base URL</span>
+                <input id="config-base-url" name="base_url" type="url" value="{{ snapshot.config.base_url }}" placeholder="http://localhost:1234/v1">
+                <p class="field-hint">仅自定义提供商需要手动填写，内置提供商会自动填入。</p>
               </label>
               <label class="field">
                 <span>API Key</span>

@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 from engine import Engine
 from commands import process_command
 from campaign import CAMPAIGNS_DIR
@@ -10,7 +11,7 @@ def push_to_display(text: str, is_player: bool = False, campaign_name: str = Non
     if not os.path.exists(script_path):
         return
         
-    cmd = ["python", script_path]
+    cmd = [sys.executable, script_path]
     if is_player:
         cmd.extend(["--player", "Party"])
     if campaign_name:

@@ -64,6 +64,9 @@ class WebUiCharacterFlowTests(unittest.TestCase):
         self.assertTrue(payload["state"]["character_guide"]["active"])
         self.assertEqual(payload["state"]["character_guide"]["state"], "create_character")
         self.assertIn("开始创建角色", payload["state"]["chat_history"][0]["content"])
+        controls = payload["state"]["character_guide"]["controls"]
+        self.assertEqual(controls["mode"], "chips")
+        self.assertEqual(controls["title"], "角色姓名")
 
     def test_character_creation_flow_persists_character_and_starts_session(self):
         self.assertTrue(campaign.create_campaign("alpha", "dnd5e"))
@@ -91,6 +94,37 @@ class WebUiCharacterFlowTests(unittest.TestCase):
         self.assertEqual(payload["state"]["system_meta"]["resource_value"], "11 / 12 / +2")
         self.assertIn("Aldric 作战面板", payload["state"]["system_meta"]["specialized_panel"]["title"])
         self.assertIn("开场：Aldric 进入冒险。", payload["message"])
+
+    def test_dnd_creation_guide_exposes_clickable_options(self):
+        self.assertTrue(campaign.create_campaign("alpha", "dnd5e"))
+        self.client.post("/api/campaigns/load", json={"name": "alpha"})
+
+        race_payload = self.client.post("/api/chat", json={"message": "Aldric"}).get_json()
+        race_controls = race_payload["state"]["character_guide"]["controls"]
+        self.assertEqual(race_controls["title"], "选择种族")
+        self.assertEqual(race_controls["mode"], "cards")
+        self.assertIn("human", [option["value"] for option in race_controls["options"]])
+
+        class_payload = self.client.post("/api/chat", json={"message": "human"}).get_json()
+        class_controls = class_payload["state"]["character_guide"]["controls"]
+        self.assertEqual(class_controls["title"], "选择职业")
+        self.assertIn("fighter", [option["value"] for option in class_controls["options"]])
+
+        self.client.post("/api/chat", json={"message": "fighter"})
+        self.client.post("/api/chat", json={"message": "soldier"})
+        self.client.post("/api/chat", json={"message": "Lawful Good"})
+        score_payload = self.client.post("/api/chat", json={"message": "manual"}).get_json()
+        score_controls = score_payload["state"]["character_guide"]["controls"]
+        self.assertEqual(score_controls["title"], "选择属性模板")
+        self.assertTrue(score_controls["options"][0]["value"].startswith("STR="))
+
+        skill_payload = self.client.post(
+            "/api/chat",
+            json={"message": "STR=15 DEX=14 CON=13 INT=12 WIS=10 CHA=8"},
+        ).get_json()
+        skill_controls = skill_payload["state"]["character_guide"]["controls"]
+        self.assertEqual(skill_controls["mode"], "multi_select")
+        self.assertIn("Athletics", [option["value"] for option in skill_controls["options"]])
 
     def test_load_campaign_with_existing_character_prompts_reuse(self):
         self.assertTrue(campaign.create_campaign("alpha", "dnd5e"))

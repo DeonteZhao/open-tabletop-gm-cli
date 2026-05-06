@@ -12,6 +12,11 @@
     importingModule: false,
     chatPending: false,
     pendingUserMessage: "",
+    typedAssistantKey: null,
+    activeTypewriterKey: "",
+    typewriterTimer: 0,
+    guideSelectionKey: "",
+    guideSelections: [],
   };
   const CAMPAIGN_NAME_DISPLAY_LIMIT = 14;
 
@@ -37,6 +42,7 @@
     chatCampaign: document.getElementById("chat-campaign"),
     chatCharacter: document.getElementById("chat-character"),
     chatSystem: document.getElementById("chat-system"),
+    guidePanel: document.getElementById("character-guide-panel"),
     saveCampaignButton: document.getElementById("save-campaign-button"),
     deleteCurrentCampaignButton: document.getElementById("delete-current-campaign-button"),
     characterGrid: document.getElementById("character-grid"),
@@ -47,6 +53,8 @@
     characterPanelCopy: document.getElementById("character-panel-copy"),
     configForm: document.getElementById("config-form"),
     provider: document.getElementById("config-provider"),
+    baseUrl: document.getElementById("config-base-url"),
+    baseUrlField: document.getElementById("config-base-url-field"),
     apiKey: document.getElementById("config-api-key"),
     apiKeyToggle: document.getElementById("config-api-key-toggle"),
     apiKeyHint: document.getElementById("config-api-key-hint"),
@@ -269,6 +277,41 @@
     return role === "user" ? "user" : "spark";
   }
 
+  function messageKey(message, index) {
+    const content = String(message.content || "");
+    let hash = 0;
+    for (let charIndex = 0; charIndex < content.length; charIndex += 1) {
+      hash = ((hash << 5) - hash + content.charCodeAt(charIndex)) | 0;
+    }
+    return `${index}:${message.role}:${content.length}:${hash}`;
+  }
+
+  function latestAssistantMessageKey(history) {
+    for (let index = history.length - 1; index >= 0; index -= 1) {
+      if (history[index].role === "assistant") {
+        return messageKey(history[index], index);
+      }
+    }
+    return "";
+  }
+
+  function cancelTypewriter() {
+    if (uiState.typewriterTimer) {
+      window.clearTimeout(uiState.typewriterTimer);
+      uiState.typewriterTimer = 0;
+    }
+    uiState.activeTypewriterKey = "";
+  }
+
+  function resetTransientInteractionState() {
+    uiState.loadingCampaignName = "";
+    uiState.chatPending = false;
+    uiState.pendingUserMessage = "";
+    uiState.guideSelectionKey = "";
+    uiState.guideSelections = [];
+    cancelTypewriter();
+  }
+
   function pushInlineStatus(message) {
     state.status_message = message;
     renderStatus();
@@ -446,6 +489,13 @@
     const history = Array.isArray(state.chat_history) ? state.chat_history : [];
     const isLoadingCampaign = Boolean(uiState.loadingCampaignName);
     const guide = state.character_guide || {};
+    const latestAssistantKey = latestAssistantMessageKey(history);
+    let typewriterTargetKey = "";
+
+    if (uiState.typedAssistantKey === null) {
+      uiState.typedAssistantKey = latestAssistantKey;
+    }
+
     elements.chatSubmit.disabled = !state.chat_ready || isLoadingCampaign || uiState.chatPending;
     elements.chatInput.disabled = !state.chat_ready || isLoadingCampaign || uiState.chatPending;
     if (elements.saveCampaignButton) {
@@ -512,11 +562,20 @@
     }
 
     const renderedMessages = history
-      .map((message) => {
+      .map((message, index) => {
         const roleLabel = message.role === "user" ? "玩家输入" : "AI GM";
         const content = renderMarkdown(message.content);
+        const key = messageKey(message, index);
+        const shouldType =
+          message.role === "assistant" &&
+          key === latestAssistantKey &&
+          key !== uiState.typedAssistantKey &&
+          !uiState.chatPending;
+        if (shouldType) {
+          typewriterTargetKey = key;
+        }
         return [
-          `<article class="chat-message ${escapeHtml(message.role)}">`,
+          `<article class="chat-message ${escapeHtml(message.role)}${shouldType ? " typewriter-message" : ""}" data-message-key="${escapeAttribute(key)}">`,
           `<p class="eyebrow">${renderIcon(messageIcon(message.role), "icon icon-xs")}<span>${roleLabel}</span></p>`,
           `<div class="message-body">${content}</div>`,
           "</article>",
@@ -549,8 +608,177 @@
     }
 
     elements.chatLog.innerHTML = renderedMessages.join("");
+    if (typewriterTargetKey) {
+      startTypewriter(typewriterTargetKey);
+    } else if (!uiState.activeTypewriterKey) {
+      cancelTypewriter();
+    }
 
     elements.chatLog.scrollTop = elements.chatLog.scrollHeight;
+  }
+
+  function startTypewriter(messageKeyValue) {
+    if (uiState.activeTypewriterKey === messageKeyValue) {
+      return;
+    }
+    cancelTypewriter();
+
+    const messageNode = Array.from(elements.chatLog.querySelectorAll(".chat-message"))
+      .find((node) => node.dataset.messageKey === messageKeyValue);
+    const bodyNode = messageNode && messageNode.querySelector(".message-body");
+    if (!bodyNode) {
+      uiState.typedAssistantKey = messageKeyValue;
+      return;
+    }
+
+    const walker = document.createTreeWalker(bodyNode, NodeFilter.SHOW_TEXT);
+    const textNodes = [];
+    let currentNode = walker.nextNode();
+    while (currentNode) {
+      if (currentNode.nodeValue.trim()) {
+        textNodes.push({
+          node: currentNode,
+          text: currentNode.nodeValue,
+          offset: 0,
+        });
+      }
+      currentNode = walker.nextNode();
+    }
+
+    if (!textNodes.length) {
+      uiState.typedAssistantKey = messageKeyValue;
+      return;
+    }
+
+    textNodes.forEach((item) => {
+      item.node.nodeValue = "";
+    });
+    bodyNode.classList.add("is-typewriting");
+    uiState.activeTypewriterKey = messageKeyValue;
+
+    let nodeIndex = 0;
+    const charsPerTick = 2;
+    const tickDelay = 18;
+
+    function tick() {
+      if (uiState.activeTypewriterKey !== messageKeyValue) {
+        return;
+      }
+
+      let remaining = charsPerTick;
+      while (remaining > 0 && nodeIndex < textNodes.length) {
+        const item = textNodes[nodeIndex];
+        const nextOffset = Math.min(item.text.length, item.offset + remaining);
+        item.node.nodeValue = item.text.slice(0, nextOffset);
+        remaining -= nextOffset - item.offset;
+        item.offset = nextOffset;
+        if (item.offset >= item.text.length) {
+          nodeIndex += 1;
+        }
+      }
+
+      elements.chatLog.scrollTop = elements.chatLog.scrollHeight;
+      if (nodeIndex >= textNodes.length) {
+        bodyNode.classList.remove("is-typewriting");
+        uiState.typedAssistantKey = messageKeyValue;
+        uiState.activeTypewriterKey = "";
+        uiState.typewriterTimer = 0;
+        return;
+      }
+      uiState.typewriterTimer = window.setTimeout(tick, tickDelay);
+    }
+
+    tick();
+  }
+
+  function currentGuideControls() {
+    const guide = state.character_guide || {};
+    return guide.active ? (guide.controls || {}) : {};
+  }
+
+  function currentGuideKey() {
+    const guide = state.character_guide || {};
+    const controls = currentGuideControls();
+    return `${guide.state || ""}:${guide.step || ""}:${controls.mode || ""}`;
+  }
+
+  function ensureGuideSelectionState() {
+    const key = currentGuideKey();
+    if (uiState.guideSelectionKey !== key) {
+      uiState.guideSelectionKey = key;
+      uiState.guideSelections = [];
+    }
+  }
+
+  function renderGuideOption(option, mode, selectedValues) {
+    const value = String(option.value || "");
+    const selected = selectedValues.includes(value);
+    const classes = [
+      mode === "chips" ? "guide-chip" : "guide-choice-card",
+      selected ? "is-selected" : "",
+    ].filter(Boolean).join(" ");
+    const action = mode === "multi_select" ? "toggle-guide-option" : "submit-guide-option";
+    const eyebrow = option.eyebrow ? `<span class="guide-option-eyebrow">${escapeHtml(option.eyebrow)}</span>` : "";
+    const desc = option.desc ? `<span class="guide-option-desc">${escapeHtml(option.desc)}</span>` : "";
+
+    return [
+      `<button class="${classes}" type="button" data-action="${action}" data-value="${escapeAttribute(value)}" aria-pressed="${selected ? "true" : "false"}">`,
+      eyebrow,
+      `<strong>${escapeHtml(option.label || value)}</strong>`,
+      desc,
+      "</button>",
+    ].join("");
+  }
+
+  function renderGuidePanel() {
+    if (!elements.guidePanel) {
+      return;
+    }
+
+    const guide = state.character_guide || {};
+    const controls = currentGuideControls();
+    const options = Array.isArray(controls.options) ? controls.options : [];
+    if (!guide.active || !controls.mode || !options.length) {
+      elements.guidePanel.hidden = true;
+      elements.guidePanel.innerHTML = "";
+      uiState.guideSelectionKey = "";
+      uiState.guideSelections = [];
+      return;
+    }
+
+    ensureGuideSelectionState();
+    const mode = controls.mode;
+    const optionLayout = mode === "chips" || mode === "multi_select" ? "guide-chip-row" : "guide-choice-grid";
+    const selectedCount = uiState.guideSelections.length;
+    const submitSelected = mode === "multi_select"
+      ? [
+          '<div class="guide-selection-bar">',
+          `<span>${selectedCount ? `已选择 ${selectedCount} 项` : "选择一个或多个技能"}</span>`,
+          `<button class="button secondary button-compact" type="button" data-action="submit-guide-selection" ${selectedCount ? "" : "disabled"}>`,
+          `<span>${escapeHtml(controls.submit_label || "提交选择")}</span>`,
+          "</button>",
+          "</div>",
+        ].join("")
+      : "";
+
+    elements.guidePanel.hidden = false;
+    elements.guidePanel.innerHTML = [
+      '<section class="guide-builder">',
+      '<div class="guide-builder-head">',
+      '<div>',
+      `<p class="eyebrow">${escapeHtml(guide.system || "角色")}</p>`,
+      `<h4>${escapeHtml(controls.title || "角色创建")}</h4>`,
+      controls.subtitle ? `<p>${escapeHtml(controls.subtitle)}</p>` : "",
+      "</div>",
+      '<span class="chip chip-tone-neutral">Builder</span>',
+      "</div>",
+      `<div class="${optionLayout}">`,
+      options.map((option) => renderGuideOption(option, mode, uiState.guideSelections)).join(""),
+      "</div>",
+      submitSelected,
+      controls.input_label ? `<p class="field-hint">输入框仍可用于：${escapeHtml(controls.input_label)}</p>` : "",
+      "</section>",
+    ].join("");
   }
 
   function renderStatus() {
@@ -718,6 +946,9 @@
   function renderConfig() {
     const config = state.config || {};
     elements.provider.value = config.provider || "openai";
+    if (elements.baseUrl) {
+      elements.baseUrl.value = config.base_url || "";
+    }
     elements.model.value = config.model || "";
     elements.apiKey.placeholder = config.api_key_configured ? "已存在，留空则保持不变" : "sk-...";
     if (elements.apiKeyToggle) {
@@ -743,12 +974,22 @@
       return;
     }
 
-    const baseUrl = selectedOption.dataset.baseUrl || "";
+    const isCustom = elements.provider.value === "custom";
+    const baseUrl = isCustom ? (elements.baseUrl?.value || "") : (selectedOption.dataset.baseUrl || "");
     const modelPlaceholder = selectedOption.dataset.modelPlaceholder || "gpt-4o";
     elements.model.placeholder = modelPlaceholder;
+    if (elements.baseUrl) {
+      elements.baseUrl.disabled = !isCustom;
+      if (!isCustom) {
+        elements.baseUrl.value = selectedOption.dataset.baseUrl || "";
+      }
+    }
+    if (elements.baseUrlField) {
+      elements.baseUrlField.classList.toggle("is-muted", !isCustom);
+    }
 
     if (elements.providerHint) {
-      elements.providerHint.textContent = `当前提供商地址：${baseUrl}`;
+      elements.providerHint.textContent = `当前提供商地址：${baseUrl || "请填写自定义 Base URL"}`;
     }
   }
 
@@ -756,6 +997,7 @@
     renderCampaigns();
     renderCharacters();
     renderChat();
+    renderGuidePanel();
     renderStatus();
     renderConfig();
     renderImport();
@@ -809,6 +1051,39 @@
     renderAll();
   }
 
+  async function submitChatMessage(message, { clearInput = false } = {}) {
+    const cleanMessage = String(message || "").trim();
+    if (!cleanMessage) {
+      return;
+    }
+
+    uiState.chatPending = true;
+    uiState.pendingUserMessage = cleanMessage;
+    renderChat();
+    renderGuidePanel();
+    try {
+      const data = await postJson("/api/chat", { message: cleanMessage });
+      uiState.chatPending = false;
+      uiState.pendingUserMessage = "";
+      uiState.guideSelectionKey = "";
+      uiState.guideSelections = [];
+      mergeState(data.state);
+      if (clearInput && elements.chatInput) {
+        elements.chatInput.value = "";
+      }
+    } catch (error) {
+      uiState.chatPending = false;
+      uiState.pendingUserMessage = "";
+      pushInlineStatus(error.message);
+      renderChat();
+      renderGuidePanel();
+    } finally {
+      uiState.chatPending = false;
+      uiState.pendingUserMessage = "";
+      elements.chatSubmit.disabled = !state.chat_ready;
+    }
+  }
+
   elements.navLinks.forEach((link) => {
     link.addEventListener("click", () => {
       activateView(link.dataset.viewTarget);
@@ -831,7 +1106,9 @@
       button.disabled = true;
       try {
         const data = await deleteJson(`/api/campaigns/${encodeURIComponent(campaignName)}`);
+        resetTransientInteractionState();
         mergeState(data.state);
+        pushInlineStatus(data.message || `战役“${campaignName}”已删除。`);
         if (!state.current_campaign) {
           activateView("campaigns");
         }
@@ -900,12 +1177,44 @@
       elements.deleteCurrentCampaignButton.disabled = true;
       try {
         const data = await deleteJson(`/api/campaigns/${encodeURIComponent(currentCampaign)}`);
+        resetTransientInteractionState();
         mergeState(data.state);
+        pushInlineStatus(data.message || `战役“${currentCampaign}”已删除，当前会话已重置。`);
         activateView("campaigns");
       } catch (error) {
         pushInlineStatus(error.message);
       } finally {
         elements.deleteCurrentCampaignButton.disabled = !state.current_campaign;
+      }
+    });
+  }
+
+  if (elements.guidePanel) {
+    elements.guidePanel.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-action]");
+      if (!button || button.disabled) {
+        return;
+      }
+
+      const value = button.dataset.value || "";
+      if (button.dataset.action === "submit-guide-option") {
+        submitChatMessage(value, { clearInput: false });
+        return;
+      }
+
+      if (button.dataset.action === "toggle-guide-option") {
+        ensureGuideSelectionState();
+        if (uiState.guideSelections.includes(value)) {
+          uiState.guideSelections = uiState.guideSelections.filter((item) => item !== value);
+        } else {
+          uiState.guideSelections = [...uiState.guideSelections, value];
+        }
+        renderGuidePanel();
+        return;
+      }
+
+      if (button.dataset.action === "submit-guide-selection") {
+        submitChatMessage(uiState.guideSelections.join(", "), { clearInput: false });
       }
     });
   }
@@ -966,6 +1275,7 @@
       api_key: uiState.apiKeyModified ? elements.apiKey.value : "",
       api_key_modified: uiState.apiKeyModified,
       model: elements.model.value,
+      base_url: elements.baseUrl ? elements.baseUrl.value : "",
     };
 
     try {
@@ -987,6 +1297,12 @@
   elements.provider.addEventListener("change", () => {
     renderProviderHint();
   });
+
+  if (elements.baseUrl) {
+    elements.baseUrl.addEventListener("input", () => {
+      renderProviderHint();
+    });
+  }
 
   if (elements.importSourceTrigger) {
     elements.importSourceTrigger.addEventListener("click", () => {
@@ -1024,29 +1340,7 @@
   elements.chatForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const message = elements.chatInput.value.trim();
-    if (!message) {
-      return;
-    }
-
-    uiState.chatPending = true;
-    uiState.pendingUserMessage = message;
-    renderChat();
-    try {
-      const data = await postJson("/api/chat", { message });
-      uiState.chatPending = false;
-      uiState.pendingUserMessage = "";
-      mergeState(data.state);
-      elements.chatInput.value = "";
-    } catch (error) {
-      uiState.chatPending = false;
-      uiState.pendingUserMessage = "";
-      pushInlineStatus(error.message);
-      renderChat();
-    } finally {
-      uiState.chatPending = false;
-      uiState.pendingUserMessage = "";
-      elements.chatSubmit.disabled = !state.chat_ready;
-    }
+    submitChatMessage(message, { clearInput: true });
   });
 
   renderAll();

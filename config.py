@@ -11,12 +11,12 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 class Config:
     def __init__(self, prefer_env: bool = True):
         self.prefer_env = prefer_env
-        self.api_key = os.environ.get("OPENAI_API_KEY", "")
-        env_base_url = os.environ.get("OPENAI_BASE_URL", "")
-        env_provider = os.environ.get("OPENAI_PROVIDER", "")
+        self.api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENTTG_API_KEY", "")
+        env_base_url = os.environ.get("OPENAI_BASE_URL") or os.environ.get("OPENTTG_BASE_URL", "")
+        env_provider = os.environ.get("OPENAI_PROVIDER") or os.environ.get("OPENTTG_PROVIDER", "")
         self.provider = normalize_provider(env_provider, env_base_url)
         self.base_url = env_base_url or provider_base_url(self.provider)
-        self.model = os.environ.get("OPENAI_MODEL", "gpt-4o")
+        self.model = os.environ.get("OPENAI_MODEL") or os.environ.get("OPENTTG_MODEL", "gpt-4o")
 
     def normalize(self):
         self.provider = normalize_provider(self.provider, self.base_url)
@@ -31,13 +31,13 @@ class Config:
                     data = json.load(f)
                     if self.prefer_env:
                         # Environment variables take precedence if they are set.
-                        if not os.environ.get("OPENAI_API_KEY"):
+                        if not (os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENTTG_API_KEY")):
                             self.api_key = data.get("api_key", self.api_key)
-                        if not os.environ.get("OPENAI_PROVIDER"):
+                        if not (os.environ.get("OPENAI_PROVIDER") or os.environ.get("OPENTTG_PROVIDER")):
                             self.provider = data.get("provider", self.provider)
-                        if not os.environ.get("OPENAI_BASE_URL"):
+                        if not (os.environ.get("OPENAI_BASE_URL") or os.environ.get("OPENTTG_BASE_URL")):
                             self.base_url = data.get("base_url", self.base_url)
-                        if not os.environ.get("OPENAI_MODEL"):
+                        if not (os.environ.get("OPENAI_MODEL") or os.environ.get("OPENTTG_MODEL")):
                             self.model = data.get("model", self.model)
                     else:
                         self.api_key = data.get("api_key", self.api_key)
@@ -88,6 +88,11 @@ def interactive_config():
                 config.provider = provider_options[selected_index]["value"]
         else:
             config.provider = normalize_provider(provider_input)
+
+    if config.provider == "custom":
+        base_url = input(f"Base URL [{config.base_url}]: ").strip()
+        if base_url:
+            config.base_url = base_url
 
     api_key = input(f"API Key [{config.api_key}]: ").strip()
     if api_key:
