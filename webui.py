@@ -28,7 +28,7 @@ from characters import (
     DND_CLASS_OPTIONS,
     DND_CLASS_NAMES,
     DND_RACE_OPTIONS,
-    DND_SKILL_NAMES,
+    DND_SKILL_DISPLAY,
     DND_STATS,
     build_coc_character_record,
     build_dnd_character_record,
@@ -133,6 +133,65 @@ SYSTEM_META = {
     },
 }
 
+DND_ALIGNMENT_OPTIONS = [
+    ("Lawful Good", "守序善良", "讲原则、重承诺，倾向保护弱者。"),
+    ("Neutral Good", "中立善良", "优先做正确的事，不被阵营教条束缚。"),
+    ("Chaotic Good", "混乱善良", "自由而热心，愿意打破规则帮助别人。"),
+    ("Lawful Neutral", "守序中立", "相信制度、契约或个人准则。"),
+    ("True Neutral", "绝对中立", "务实、平衡，避免被极端立场裹挟。"),
+    ("Chaotic Neutral", "混乱中立", "重视自由和直觉，行动难以预测。"),
+    ("Lawful Evil", "守序邪恶", "冷静利用规则、权力和契约。"),
+    ("Neutral Evil", "中立邪恶", "目标优先，少受道德和秩序约束。"),
+    ("Chaotic Evil", "混乱邪恶", "冲动、破坏性强，适合黑暗角色。"),
+    ("未指定", "未指定", "暂不固定阵营，先在游戏中自然塑形。"),
+]
+
+DND_SCORE_PRESETS = [
+    ("STR=15 DEX=14 CON=13 INT=12 WIS=10 CHA=8", "力量前线", "适合战士、圣武士、野蛮人。"),
+    ("STR=8 DEX=14 CON=13 INT=15 WIS=12 CHA=10", "学识施法", "适合法师、调查型角色。"),
+    ("STR=8 DEX=15 CON=13 INT=12 WIS=14 CHA=10", "敏捷游侠", "适合游荡者、游侠、潜行路线。"),
+    ("STR=10 DEX=12 CON=13 INT=8 WIS=14 CHA=15", "魅力领袖", "适合吟游诗人、术士、邪术师。"),
+]
+
+COC_ERA_OPTIONS = [
+    ("1920年代", "1920年代", "经典调查年代，适合诡秘庄园与城市阴影。"),
+    ("现代", "现代", "手机、网络与现代职业都可直接纳入故事。"),
+    ("维多利亚时代", "维多利亚时代", "蒸汽、绅士俱乐部与早期神秘学氛围。"),
+]
+
+COC_OCCUPATION_OPTIONS = [
+    ("私家侦探", "私家侦探", "擅长追踪线索、盘问和危险调查。"),
+    ("记者", "记者", "适合采访、资料挖掘和社交突破。"),
+    ("医生", "医生", "医学、急救和理性判断更强。"),
+    ("教授", "教授", "知识面广，适合图书馆和学术线索。"),
+    ("古董商", "古董商", "熟悉旧物、拍卖、人脉与赝品。"),
+]
+
+COC_AGE_OPTIONS = [
+    ("25", "25 岁", "年轻、行动力强，适合冒进型调查员。"),
+    ("35", "35 岁", "经验与体力比较均衡。"),
+    ("45", "45 岁", "阅历更深，适合沉稳职业角色。"),
+    ("55", "55 岁", "老练但行动力开始下降。"),
+]
+
+COC_SCORE_PRESETS = [
+    (
+        "STR=60 CON=55 SIZ=60 DEX=65 APP=50 INT=75 POW=60 EDU=70",
+        "理性调查员",
+        "高 INT/EDU，适合推理、资料检索和知识检定。",
+    ),
+    (
+        "STR=50 CON=55 SIZ=55 DEX=60 APP=70 INT=65 POW=65 EDU=60",
+        "社交突破者",
+        "较高 APP/POW，适合谈判、采访和抗压。",
+    ),
+    (
+        "STR=70 CON=65 SIZ=70 DEX=60 APP=45 INT=60 POW=55 EDU=55",
+        "硬派行动派",
+        "身体属性更强，适合危险现场和冲突场景。",
+    ),
+]
+
 
 def _get_system_meta(system: str) -> dict[str, object]:
     return SYSTEM_META.get(system, SYSTEM_META["dnd5e"])
@@ -227,12 +286,240 @@ def _list_campaign_payload() -> list[dict[str, str]]:
     return [_serialize_campaign(name) for name in campaigns]
 
 
+def _control_option(value: str, label: str, desc: str = "", eyebrow: str = "") -> dict[str, str]:
+    return {
+        "value": value,
+        "label": label,
+        "desc": desc,
+        "eyebrow": eyebrow,
+    }
+
+
+def _options_from_meta(options: dict[str, dict[str, str]]) -> list[dict[str, str]]:
+    return [
+        _control_option(key, meta["label"], meta.get("desc", ""), key.upper())
+        for key, meta in options.items()
+    ]
+
+
+def _options_from_pairs(options: list[tuple[str, str, str]]) -> list[dict[str, str]]:
+    return [_control_option(value, label, desc) for value, label, desc in options]
+
+
+def _score_preset_options(presets: list[tuple[str, str, str]]) -> list[dict[str, str]]:
+    return [_control_option(value, label, desc, value) for value, label, desc in presets]
+
+
+def _build_character_guide_controls(state: SessionState) -> dict[str, object]:
+    context = state.guide_context
+    step = context.get("step", "")
+    form = context.get("form") if isinstance(context.get("form"), dict) else {}
+
+    if state.guide_state == "choose_existing":
+        return {
+            "title": "选择角色入口",
+            "subtitle": "检测到已有可用角色，可以直接启用，也可以创建新角色。",
+            "mode": "cards",
+            "options": [
+                _control_option("是", "使用已有角色", "直接进入当前战役。"),
+                _control_option("否", "创建新角色", "打开角色创建流程。"),
+            ],
+            "input_label": "也可以输入“是”或“否”",
+        }
+
+    if state.guide_state == "select_existing":
+        characters = list_campaign_characters(state.campaign_name)
+        return {
+            "title": "选择已有角色",
+            "subtitle": "点击角色卡即可启用，也可以继续输入编号或角色名。",
+            "mode": "cards",
+            "options": [
+                _control_option(str(index), character["name"], character.get("summary", ""), character.get("origin_campaign", ""))
+                for index, character in enumerate(characters, start=1)
+            ],
+            "input_label": "输入编号或角色名",
+        }
+
+    if state.guide_state == "confirm_character":
+        return {
+            "title": "确认角色卡",
+            "subtitle": "保存后会进入战役开场。",
+            "mode": "confirm",
+            "options": [
+                _control_option("是", "确认并开始", "保存角色，进入冒险。"),
+                _control_option("否", "重新创建", "放弃当前草稿。"),
+            ],
+            "input_label": "也可以输入“是”或“否”",
+        }
+
+    if state.guide_state != "create_character":
+        return {}
+
+    if state.campaign_system == "coc7e":
+        if step == "name":
+            return {
+                "title": "调查员姓名",
+                "subtitle": "输入姓名，或者从范例名开始再自行调整。",
+                "mode": "chips",
+                "options": _options_from_pairs([
+                    ("Harvey Walters", "Harvey Walters", "经典调查员名。"),
+                    ("林秋石", "林秋石", "现代中文调查员名。"),
+                    ("Eleanor Price", "Eleanor Price", "适合维多利亚或学术背景。"),
+                ]),
+                "input_label": "调查员姓名",
+            }
+        if step == "era":
+            return {
+                "title": "选择时代",
+                "subtitle": "时代会影响职业、线索形式和叙事质感。",
+                "mode": "cards",
+                "options": _options_from_pairs(COC_ERA_OPTIONS),
+                "input_label": "自定义时代",
+            }
+        if step == "occupation":
+            return {
+                "title": "选择职业",
+                "subtitle": "职业决定调查路径和角色在队伍中的功能。",
+                "mode": "cards",
+                "options": _options_from_pairs(COC_OCCUPATION_OPTIONS),
+                "input_label": "自定义职业",
+            }
+        if step == "age":
+            return {
+                "title": "选择年龄",
+                "subtitle": "年龄会影响移动力，也会改变角色阅历感。",
+                "mode": "chips",
+                "options": _options_from_pairs(COC_AGE_OPTIONS),
+                "input_label": "自定义年龄",
+            }
+        if step == "scores":
+            return {
+                "title": "选择属性模板",
+                "subtitle": "先选一个调查员原型，之后仍可用输入框提交自定义八项属性。",
+                "mode": "cards",
+                "options": _score_preset_options(COC_SCORE_PRESETS),
+                "input_label": "自定义属性",
+            }
+        if step == "skills_summary":
+            return {
+                "title": "关键技能摘要",
+                "subtitle": "选择一个技能组合，或直接输入你想强调的技能。",
+                "mode": "chips",
+                "options": _options_from_pairs([
+                    ("图书馆使用 70，侦查 60，聆听 55", "资料调查", "适合线索和档案检索。"),
+                    ("心理学 65，话术 60，信誉 50", "社交突破", "适合访谈与人际推进。"),
+                    ("急救 60，医学 50，自然学 55", "现场支援", "适合危险现场和伤情处理。"),
+                ]),
+                "input_label": "自定义关键技能",
+            }
+        if step == "backstory":
+            return {
+                "title": "背景钩子",
+                "subtitle": "选择一个动机作为开局抓手，后续可继续细化。",
+                "mode": "cards",
+                "options": _options_from_pairs([
+                    ("正在追查一宗多年未破的失踪案。", "未破旧案", "适合调查与个人执念。"),
+                    ("收到旧友求助信后赶来此地。", "旧友求助", "适合快速卷入事件。"),
+                    ("为一件来历不明的古物寻找真相。", "神秘古物", "适合克苏鲁式物件线索。"),
+                ]),
+                "input_label": "自定义背景",
+            }
+        return {}
+
+    if step == "name":
+        return {
+            "title": "角色姓名",
+            "subtitle": "输入姓名，或者先选一个范例名快速开始。",
+            "mode": "chips",
+            "options": _options_from_pairs([
+                ("Aldric", "Aldric", "适合骑士、战士。"),
+                ("Vesper", "Vesper", "适合游荡者、法师。"),
+                ("Mira", "Mira", "适合游侠、牧师。"),
+            ]),
+            "input_label": "角色姓名",
+        }
+    if step == "race":
+        return {
+            "title": "选择种族",
+            "subtitle": "点击卡片即可选择，输入框仍支持中文名或英文键名。",
+            "mode": "cards",
+            "options": _options_from_meta(DND_RACE_OPTIONS),
+            "input_label": "自定义种族",
+        }
+    if step == "class":
+        return {
+            "title": "选择职业",
+            "subtitle": "职业决定生命骰、豁免熟练和玩法定位。",
+            "mode": "cards",
+            "options": _options_from_meta(DND_CLASS_OPTIONS),
+            "input_label": "职业名",
+        }
+    if step == "background":
+        return {
+            "title": "选择背景",
+            "subtitle": "背景决定角色进入故事的社会身份。",
+            "mode": "cards",
+            "options": _options_from_meta(DND_BACKGROUND_OPTIONS),
+            "input_label": "背景名",
+        }
+    if step == "alignment":
+        return {
+            "title": "选择阵营",
+            "subtitle": "阵营不是束缚，只是开局时的行为倾向。",
+            "mode": "chips",
+            "options": _options_from_pairs(DND_ALIGNMENT_OPTIONS),
+            "input_label": "自定义阵营",
+        }
+    if step == "ability_method":
+        return {
+            "title": "选择属性生成方式",
+            "subtitle": "想要随机命运、平衡规划或直接自定义都可以。",
+            "mode": "cards",
+            "options": _options_from_meta(DND_ABILITY_METHOD_OPTIONS),
+            "input_label": "属性生成方式",
+        }
+    if step == "scores":
+        method = form.get("ability_method", "manual")
+        roll_arrays = context.get("roll_arrays") or []
+        roll_options = [
+            _control_option(
+                f"STR={array[0]} DEX={array[1]} CON={array[2]} INT={array[3]} WIS={array[4]} CHA={array[5]}",
+                f"掷骰数组 {index}",
+                "点击后按 STR/DEX/CON/INT/WIS/CHA 顺序分配。",
+                ", ".join(str(score) for score in array),
+            )
+            for index, array in enumerate(roll_arrays, start=1)
+        ]
+        return {
+            "title": "选择属性模板",
+            "subtitle": "先用一个模板开局；想精调时仍可直接输入六维。",
+            "mode": "cards",
+            "options": roll_options or _score_preset_options(DND_SCORE_PRESETS),
+            "input_label": "自定义六维",
+            "meta": {"method": method},
+        }
+    if step == "proficiencies":
+        return {
+            "title": "选择熟练技能",
+            "subtitle": "可多选，点“提交选择”后继续确认角色卡。",
+            "mode": "multi_select",
+            "submit_label": "提交技能",
+            "options": [
+                _control_option(skill, meta["label"], meta.get("desc", ""), skill)
+                for skill, meta in DND_SKILL_DISPLAY.items()
+            ],
+            "input_label": "也可以输入逗号分隔的技能",
+        }
+    return {}
+
+
 def _serialize_character_guide(state: SessionState) -> dict[str, object]:
     return {
         "active": bool(state.guide_state),
         "state": state.guide_state,
         "step": state.guide_context.get("step", ""),
         "system": state.campaign_system,
+        "controls": _build_character_guide_controls(state),
     }
 
 

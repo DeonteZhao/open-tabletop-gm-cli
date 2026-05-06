@@ -97,6 +97,20 @@ class WebUiMemoryTests(unittest.TestCase):
         self.assertIn("玩家进入了老宅", content)
         self.assertNotIn("State saved by user command", content)
 
+    def test_delete_loaded_campaign_resets_session_state(self):
+        self._create_character_and_start()
+
+        response = self.client.delete("/api/campaigns/alpha")
+        payload = response.get_json()
+
+        self.assertTrue(payload["ok"])
+        self.assertFalse((self.campaigns_dir / "alpha").exists())
+        self.assertEqual(payload["state"]["campaigns"], [])
+        self.assertIsNone(payload["state"]["current_campaign"])
+        self.assertFalse(payload["state"]["chat_ready"])
+        self.assertEqual(payload["state"]["chat_history"], [])
+        self.assertIn("已删除", payload["message"])
+
 
 if __name__ == "__main__":
     unittest.main()
